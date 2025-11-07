@@ -1,0 +1,110 @@
+{
+  "virtual_parameters": [
+    {
+      "name": "pppoeUsername",
+      "description": "Get PPPoE Username from WAN connections",
+      "script": "let username = \"\";\nfor (let i = 1; i <= 8; i++) {\n  let path = \"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.\" + i + \".WANPPPConnection.1.Username\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    username = value;\n    break;\n  }\n}\nreturn username;"
+    },
+    {
+      "name": "pppoeUsername2",
+      "description": "Alternative PPPoE Username path",
+      "script": "let username = \"\";\nfor (let i = 1; i <= 8; i++) {\n  let path = \"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.\" + i + \".WANPPPConnection.1.X_CT-COM_Username\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    username = value;\n    break;\n  }\n}\nreturn username;"
+    },
+    {
+      "name": "SSID_ALL",
+      "description": "Get all WiFi SSIDs",
+      "script": "let ssids = [];\nfor (let i = 1; i <= 4; i++) {\n  let path = \"InternetGatewayDevice.LANDevice.1.WLANConfiguration.\" + i + \".SSID\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    ssids.push(value);\n  }\n}\nreturn ssids.join(\", \");"
+    },
+    {
+      "name": "SSID",
+      "description": "Get first WiFi SSID",
+      "script": "let ssid = declare(\"InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID\", {value: Date.now()}).value[0];\nreturn ssid || \"\";"
+    },
+    {
+      "name": "WlanPassword",
+      "description": "Get WiFi Password",
+      "script": "let password = \"\";\nlet paths = [\n  \"InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase\",\n  \"InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase\",\n  \"InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey\"\n];\nfor (let path of paths) {\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    password = value;\n    break;\n  }\n}\nreturn password;"
+    },
+    {
+      "name": "RXPower",
+      "description": "Get Optical RX Power",
+      "script": "let rxPower = null;\nlet paths = [\n  \"InternetGatewayDevice.WANDevice.1.X_CT-COM_EponInterfaceConfig.RXPower\",\n  \"Device.Optical.Interface.1.RxPower\",\n  \"InternetGatewayDevice.WANDevice.1.X_BROADCOM_COM_EponInterfaceConfig.RXPower\"\n];\nfor (let path of paths) {\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value !== null && value !== undefined) {\n    rxPower = value;\n    break;\n  }\n}\nif (rxPower !== null && rxPower > 100) {\n  rxPower = (rxPower / 100) - 40;\n}\nreturn rxPower;"
+    },
+    {
+      "name": "gettemp",
+      "description": "Get Device Temperature",
+      "script": "let temp = null;\nlet paths = [\n  \"InternetGatewayDevice.WANDevice.1.X_CT-COM_EponInterfaceConfig.TransceiverTemperature\",\n  \"InternetGatewayDevice.DeviceInfo.Temperature\",\n  \"Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1.Value\"\n];\nfor (let path of paths) {\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value !== null && value !== undefined) {\n    temp = value;\n    break;\n  }\n}\nif (temp !== null && temp > 1000) {\n  temp = temp / 256;\n}\nreturn temp;"
+    },
+    {
+      "name": "Temperature",
+      "description": "Alternative Temperature parameter",
+      "script": "let temp = declare(\"InternetGatewayDevice.DeviceInfo.Temperature\", {value: Date.now()}).value[0];\nif (temp !== null && temp > 1000) {\n  temp = temp / 256;\n}\nreturn temp;"
+    },
+    {
+      "name": "pppoeIP",
+      "description": "Get PPPoE External IP",
+      "script": "let ip = \"\";\nfor (let i = 1; i <= 8; i++) {\n  let path = \"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.\" + i + \".WANPPPConnection.1.ExternalIPAddress\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\" && value !== \"0.0.0.0\") {\n    ip = value;\n    break;\n  }\n}\nreturn ip;"
+    },
+    {
+      "name": "IPTR069",
+      "description": "Get TR069 Management IP",
+      "script": "let url = declare(\"InternetGatewayDevice.ManagementServer.ConnectionRequestURL\", {value: Date.now()}).value[0];\nif (url) {\n  let match = url.match(/https?:\\/\\/([^:\\/]+)/);\n  if (match) return match[1];\n}\nreturn \"\";"
+    },
+    {
+      "name": "getponmode",
+      "description": "Detect PON Mode (EPON/GPON)",
+      "script": "let mode = \"Unknown\";\nlet eponPath = \"InternetGatewayDevice.WANDevice.1.X_CT-COM_EponInterfaceConfig\";\nlet gponPath = \"InternetGatewayDevice.WANDevice.1.X_CT-COM_GponInterfaceConfig\";\nif (declare(eponPath, {value: Date.now()}).value[0]) mode = \"EPON\";\nif (declare(gponPath, {value: Date.now()}).value[0]) mode = \"GPON\";\nreturn mode;"
+    },
+    {
+      "name": "getSerialNumber",
+      "description": "Get Device Serial Number",
+      "script": "let serial = declare(\"InternetGatewayDevice.DeviceInfo.SerialNumber\", {value: Date.now()}).value[0];\nreturn serial || \"\";"
+    },
+    {
+      "name": "getdeviceuptime",
+      "description": "Get Device Uptime (formatted)",
+      "script": "let uptime = declare(\"InternetGatewayDevice.DeviceInfo.UpTime\", {value: Date.now()}).value[0];\nif (!uptime) uptime = declare(\"Device.DeviceInfo.UpTime\", {value: Date.now()}).value[0];\nif (uptime) {\n  let s = parseInt(uptime);\n  let d = Math.floor(s / 86400);\n  let h = Math.floor((s % 86400) / 3600);\n  let m = Math.floor((s % 3600) / 60);\n  let parts = [];\n  if (d > 0) parts.push(d + \"d\");\n  if (h > 0) parts.push(h + \"h\");\n  if (m > 0) parts.push(m + \"m\");\n  return parts.join(\" \");\n}\nreturn \"0m\";"
+    },
+    {
+      "name": "activedevices",
+      "description": "Count Active Connected Devices",
+      "script": "let count = 0;\nlet hosts = declare(\"InternetGatewayDevice.LANDevice.1.Hosts.Host.*\", {value: Date.now()});\nfor (let host of hosts) {\n  let ip = host.value[0];\n  let mac = declare(host.path + \".MACAddress\", {value: Date.now()}).value[0];\n  if (ip && mac && ip !== \"0.0.0.0\") count++;\n}\nreturn count;"
+    },
+    {
+      "name": "PonMac",
+      "description": "Get PON Interface MAC Address",
+      "script": "let mac = declare(\"InternetGatewayDevice.WANDevice.1.X_CT-COM_EponInterfaceConfig.MACAddress\", {value: Date.now()}).value[0];\nif (!mac) mac = declare(\"InternetGatewayDevice.WANDevice.1.X_CT-COM_GponInterfaceConfig.MACAddress\", {value: Date.now()}).value[0];\nreturn mac || \"\";"
+    },
+    {
+      "name": "pppoeMac",
+      "description": "Get PPPoE Connection MAC Address",
+      "script": "let mac = \"\";\nfor (let i = 1; i <= 8; i++) {\n  let path = \"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.\" + i + \".WANPPPConnection.1.MACAddress\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    mac = value;\n    break;\n  }\n}\nreturn mac;"
+    },
+    {
+      "name": "pppoePassword",
+      "description": "Get PPPoE Password (if available)",
+      "script": "let password = \"\";\nfor (let i = 1; i <= 8; i++) {\n  let path = \"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.\" + i + \".WANPPPConnection.1.Password\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    password = value;\n    break;\n  }\n}\nreturn password;"
+    },
+    {
+      "name": "getpppuptime",
+      "description": "Get PPPoE Connection Uptime",
+      "script": "let uptime = \"\";\nfor (let i = 1; i <= 8; i++) {\n  let path = \"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.\" + i + \".WANPPPConnection.1.Uptime\";\n  let value = declare(path, {value: Date.now()}).value[0];\n  if (value && value !== \"\") {\n    uptime = value;\n    break;\n  }\n}\nreturn uptime;"
+    }
+  ],
+  "instructions": {
+    "step1": "Buka GenieACS Admin UI di http://localhost:3000",
+    "step2": "Login dengan credentials Anda",
+    "step3": "Klik menu 'Virtual Parameters'",
+    "step4": "Untuk setiap parameter di atas, klik 'Add' dan copy-paste name & script",
+    "step5": "Klik 'Save' untuk setiap parameter",
+    "step6": "Tunggu device inform ulang (5-30 menit) atau force refresh",
+    "step7": "Reload page Mikhmon untuk melihat data terbaru"
+  },
+  "notes": [
+    "Script di atas untuk vendor umum (Huawei, ZTE, Fiberhome, Broadcom)",
+    "Anda mungkin perlu adjust parameter path sesuai device Anda",
+    "Test dengan 1-2 device dulu sebelum apply ke semua",
+    "Monitor GenieACS logs untuk detect error",
+    "Backup script Anda sebelum modify"
+  ]
+}

@@ -1,0 +1,831 @@
+<?php
+/*
+ * GenieACS Management Interface
+ * Integrated with MikhMon - No session_start() needed, already started in index.php
+ */
+
+// Get action from URL first
+$action = isset($_GET['action']) ? $_GET['action'] : 'list';
+$device_id = isset($_GET['device_id']) ? $_GET['device_id'] : '';
+
+// Only include API if needed (not for test/minimal pages)
+if (!in_array($action, array('test', 'minimal'))) {
+    include_once('./genieacs/api.php');
+}
+
+// Function to send WhatsApp notification about device changes
+function send_device_notification($device_id, $change_type, $details = '') {
+    // Include WhatsApp functions if available
+    if (file_exists('../whatsapp/send_message.php')) {
+        include_once('../whatsapp/send_message.php');
+        include_once('../whatsapp/webhook.php');
+        
+        $message = "GenieACS Notification\n";
+        $message .= "Device: " . urldecode($device_id) . "\n";
+        $message .= "Change: " . $change_type . "\n";
+        if (!empty($details)) {
+            $message .= "Details: " . $details . "\n";
+        }
+        $message .= "Time: " . date('Y-m-d H:i:s');
+        
+        // Send notification to all admins
+        return send_admin_notification($message);
+    }
+    
+    return null;
+}
+
+// Helper function to extract data from nested arrays with multiple fallback paths
+function extract_nested_value($array, $paths) {
+    foreach ($paths as $path) {
+        // Split path by dots
+        $keys = explode('.', $path);
+        $current = $array;
+        $found = true;
+        
+        foreach ($keys as $key) {
+            // Handle array indices in brackets
+            if (preg_match('/^(\w+)\[(\d+)\]$/', $key, $matches)) {
+                $key = $matches[1];
+                $index = (int)$matches[2];
+                if (isset($current[$key]) && is_array($current[$key]) && isset($current[$key][$index])) {
+                    $current = $current[$key][$index];
+                } else {
+                    $found = false;
+                    break;
+                }
+            } else {
+                // Handle regular keys
+                if (isset($current[$key])) {
+                    $current = $current[$key];
+                } else {
+                    // Try case-insensitive search for the key
+                    $found_key = null;
+                    foreach ($current as $k => $v) {
+                        if (strtolower($k) === strtolower($key)) {
+                            $found_key = $k;
+                            break;
+                        }
+                    }
+                    if ($found_key !== null) {
+                        $current = $current[$found_key];
+                    } else {
+                        $found = false;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if ($found && $current !== null && $current !== '') {
+            // If the value is an array with a "_value" key, return that value
+            if (is_array($current) && isset($current['_value'])) {
+                return $current['_value'];
+            }
+            // If the value is an array with a "value" key, return that value
+            if (is_array($current) && isset($current['value'])) {
+                return $current['value'];
+            }
+            // Return the value directly if it's not an array or doesn't have special keys
+            return $current;
+        }
+    }
+    return 'N/A';
+}
+
+// Route to different pages based on action
+if ($action == 'simple') {
+    include('./genieacs/simple.php');
+    return;
+} elseif ($action == 'minimal') {
+    include('./genieacs/minimal.php');
+    return; // Stop execution here
+} elseif ($action == 'test') {
+    include('./genieacs/test.php');
+    return;
+} elseif ($action == 'settings') {
+    include('./genieacs/settings.php');
+    return;
+} elseif ($action == 'api_devices') {
+    // API endpoint to fetch devices - returns HTML only
+    include_once('./genieacs/api.php');
+    
+    if (!function_exists('genieacs_get_devices')) {
+        echo '<div class="alert alert-danger">';
+        echo '<h4><i class="fa fa-exclamation-triangle"></i> Function Error</h4>';
+        echo '<p>GenieACS API functions not loaded.</p>';
+        echo '</div>';
+        return;
+    }
+    
+    $devices = genieacs_get_devices();
+    
+    if (isset($devices['error'])) {
+        echo '<div class="alert alert-danger">';
+        echo '<h4><i class="fa fa-exclamation-triangle"></i> Connection Error</h4>';
+        echo '<p>' . htmlspecialchars($devices['error']) . '</p>';
+        echo '<p>Please check your GenieACS server settings.</p>';
+        echo '<a href="./?hotspot=genieacs&action=settings&session=' . $session . '" class="btn btn-warning">Go to Settings</a>';
+        echo '</div>';
+        return;
+    }
+    
+    if (empty($devices)) {
+        echo '<div class="alert alert-warning">';
+        echo '<h4><i class="fa fa-info-circle"></i> No Devices Found</h4>';
+        echo '<p>No ONU devices are currently registered in GenieACS.</p>';
+        echo '</div>';
+        return;
+    }
+    
+    // Render device table
+    include('./genieacs/device_table.php');
+    return;
+}
+
+// Default action - redirect to simple page for now
+include('./genieacs/simple.php');
+return;
+
+// OLD CODE BELOW - COMMENTED OUT FOR NOW
+/*
+?>
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fa fa-server"></i> GenieACS Management</h3>
+            </div>
+            <div class="card-body">
+                <?php if ($action == 'list'): ?>
+                    <!-- Device List -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">ONU Devices</h4>
+                        <div>
+                            <a href="./?hotspot=genieacs&action=test&session=<?= $session; ?>" class="btn btn-success btn-sm mr-1">
+                                <i class="fa fa-check"></i> Test
+                            </a>
+                            <a href="./?hotspot=genieacs&action=settings&session=<?= $session; ?>" class="btn btn-warning btn-sm mr-1">
+                                <i class="fa fa-cog"></i> Settings
+                            </a>
+                            <a href="./?hotspot=genieacs&action=list&session=<?= $session; ?>&debug=true" class="btn btn-info btn-sm">
+                                <i class="fa fa-bug"></i> Debug
+                            </a>
+                            <button onclick="loadDevices()" class="btn btn-primary btn-sm">
+                                <i class="fa fa-refresh"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Indicator -->
+                    <div id="loading-indicator" class="alert alert-info" style="display:none;">
+                        <i class="fa fa-spinner fa-spin"></i> Loading devices from GenieACS server...
+                    </div>
+                    
+                    <!-- Device Container -->
+                    <div id="device-container">
+                        <div class="alert alert-success">
+                            <i class="fa fa-check"></i> Page loaded successfully! Click Refresh to load devices.
+                        </div>
+                    </div>
+                    
+                    <script>
+                    function loadDevices() {
+                        console.log('loadDevices() called');
+                        document.getElementById('loading-indicator').style.display = 'block';
+                        document.getElementById('device-container').innerHTML = '';
+                        
+                        var url = './?hotspot=genieacs&action=api_devices&session=<?= $session; ?>';
+                        console.log('Fetching from: ' + url);
+                        
+                        // Use fetch API to load devices without blocking page
+                        fetch(url)
+                            .then(function(response) {
+                                console.log('Response received:', response.status);
+                                return response.text();
+                            })
+                            .then(function(html) {
+                                console.log('HTML received, length:', html.length);
+                                document.getElementById('loading-indicator').style.display = 'none';
+                                document.getElementById('device-container').innerHTML = html;
+                            })
+                            .catch(function(error) {
+                                console.error('Fetch error:', error);
+                                document.getElementById('loading-indicator').style.display = 'none';
+                                document.getElementById('device-container').innerHTML = 
+                                    '<div class="alert alert-danger"><i class="fa fa-exclamation-triangle"></i> Error loading devices: ' + error + '</div>';
+                            });
+                    }
+                    
+                    // Don't auto load - let user click Refresh button
+                    console.log('GenieACS page loaded, ready to fetch devices');
+                    </script>
+                    
+                    <?php
+                    // Don't fetch devices here anymore - will be done via AJAX
+                    /*
+                    // Check if function exists
+                    if (!function_exists('genieacs_get_devices')) {
+                        echo '<div class="alert alert-danger">';
+                        echo '<h4><i class="fa fa-exclamation-triangle"></i> Function Error</h4>';
+                        echo '<p>GenieACS API functions not loaded. Please check if api.php exists.</p>';
+                        echo '</div>';
+                    } else {
+                        error_log("Fetching devices from GenieACS");
+                        $devices = genieacs_get_devices();
+                        error_log("Devices response: " . print_r($devices, true));
+                    
+                    // For debugging - show raw data structure
+                    if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
+                        echo "<div class='alert alert-info'>";
+                        echo "<h4><i class='fa fa-bug'></i> Debug Information</h4>";
+                        echo "<pre>" . htmlspecialchars(print_r($devices, true)) . "</pre>";
+                        echo "</div>";
+                    }
+                    
+                    if (isset($devices['error'])):
+                        // Check if it's a cURL error
+                        if (strpos($devices['error'], 'cURL extension is not available') !== false):
+                    ?>
+                        <div class="alert alert-danger">
+                            <h4><i class="fa fa-exclamation-triangle"></i> cURL Extension Required</h4>
+                            <p><?php echo htmlspecialchars($devices['error']); ?></p>
+                            <p>To fix this issue:</p>
+                            <ol>
+                                <li>Locate your php.ini file</li>
+                                <li>Find the line: <code>;extension=curl</code></li>
+                                <li>Remove the semicolon to uncomment it: <code>extension=curl</code></li>
+                                <li>Restart your web server</li>
+                            </ol>
+                        </div>
+                    <?php 
+                        // Check if it's a connection error
+                        elseif (strpos($devices['error'], 'Unable to connect') !== false):
+                    ?>
+                        <div class="alert alert-danger">
+                            <h4><i class="fa fa-plug"></i> Connection Error</h4>
+                            <p><?php echo htmlspecialchars($devices['error']); ?></p>
+                            <p>GenieACS API should be accessible at port 7557 according to documentation. The system will automatically try alternative ports:</p>
+                            <ul>
+                                <li>7557 (standard GenieACS port)</li>
+                                <li>80 (common HTTP port)</li>
+                                <li>8080 (common alternative)</li>
+                                <li>3000 (common development port)</li>
+                            </ul>
+                            <p>Please check:</p>
+                            <ul>
+                                <li>That GenieACS server is running and accessible</li>
+                                <li>Firewall settings allow connections from MIKHMON server to GenieACS server</li>
+                                <li>GenieACS configuration in <a href="./?genieacs&action=settings&session=<?php echo $session; ?>">Settings</a></li>
+                            </ul>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-danger">
+                            <h4><i class="fa fa-exclamation-circle"></i> Error</h4>
+                            <p><?php echo htmlspecialchars($devices['error']); ?></p>
+                        </div>
+                    <?php 
+                        endif;
+                    elseif (empty($devices)): 
+                    ?>
+                        <div class="alert alert-info">
+                            <h4><i class="fa fa-info-circle"></i> No Devices Found</h4>
+                            <p>No devices found. Please make sure ONU devices are connected and registered with GenieACS.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead class="thead-dark">
+                                    <tr>
+                                        <th>Device ID</th>
+                                        <th>PON Mode</th>
+                                        <th>Model</th>
+                                        <th>Serial Number</th>
+                                        <th>PPPoE ID</th>
+                                        <th>RX Power</th>
+                                        <th>Last Inform</th>
+                                        <th>Active Connections</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    // Handle both array and object formats
+                                    $devices_array = is_array($devices) ? $devices : array($devices);
+                                    foreach ($devices_array as $device): 
+                                        // Ensure $device is an array
+                                        if (is_object($device)) {
+                                            $device = (array) $device;
+                                        }
+                                        
+                                        // Log device structure for debugging
+                                        error_log("Device structure: " . print_r($device, true));
+                                        
+                                        // Extract data with proper fallbacks
+                                        $device_id = isset($device['_id']) ? $device['_id'] : 'N/A';
+                                        
+                                        // Try different paths for PON Mode with better handling
+                                        $pon_mode = 'N/A';
+                                        $pon_mode_paths = array(
+                                            'VirtualParameters.getponmode',
+                                            'InternetGatewayDevice.DeviceInfo.Manufacturer'
+                                        );
+                                        foreach ($pon_mode_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $pon_mode = $value;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Try different paths for Model with better handling
+                                        $model = 'N/A';
+                                        $model_paths = array(
+                                            'InternetGatewayDevice.DeviceInfo.ModelName',
+                                            'DeviceID.ProductClass'
+                                        );
+                                        foreach ($model_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $model = $value;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Try different paths for Serial Number with better handling
+                                        $serial_number = 'N/A';
+                                        $serial_paths = array(
+                                            'VirtualParameters.getSerialNumber',
+                                            'InternetGatewayDevice.DeviceInfo.SerialNumber'
+                                        );
+                                        foreach ($serial_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $serial_number = $value;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Try different paths for PPPoE ID with better handling
+                                        $pppoe_id = 'N/A';
+                                        $pppoe_paths = array(
+                                            'VirtualParameters.pppoeUsername2',
+                                            'VirtualParameters.pppoeUsername'
+                                        );
+                                        foreach ($pppoe_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $pppoe_id = $value;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Try different paths for RX Power with better handling
+                                        $rx_power = 'N/A';
+                                        $rx_power_paths = array(
+                                            'VirtualParameters.RXPower'
+                                        );
+                                        foreach ($rx_power_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $rx_power = $value;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Try different paths for Last Inform with better handling
+                                        $last_inform = 'N/A';
+                                        $last_inform_paths = array(
+                                            'Events.Inform',
+                                            '_lastInform'
+                                        );
+                                        foreach ($last_inform_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $last_inform = $value;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Try to get Active Connections from device data
+                                        $active_connections = 'N/A';
+                                        $active_conn_paths = array(
+                                            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'
+                                        );
+                                        foreach ($active_conn_paths as $path) {
+                                            $value = extract_nested_value($device, array($path));
+                                            if ($value !== 'N/A') {
+                                                $active_connections = $value;
+                                                break;
+                                            }
+                                        }
+                                    ?>
+                                        <tr>
+                                            <td data-label="Device ID"><?php echo htmlspecialchars($device_id); ?></td>
+                                            <td data-label="PON Mode"><?php echo htmlspecialchars($pon_mode); ?></td>
+                                            <td data-label="Model"><?php echo htmlspecialchars($model); ?></td>
+                                            <td data-label="Serial"><?php echo htmlspecialchars($serial_number); ?></td>
+                                            <td data-label="PPPoE ID"><?php echo htmlspecialchars($pppoe_id); ?></td>
+                                            <td data-label="RX Power"><?php echo htmlspecialchars($rx_power); ?><?php echo ($rx_power !== 'N/A' && $rx_power !== '') ? ' dBm' : ''; ?></td>
+                                            <td data-label="Last Inform"><?php echo htmlspecialchars($last_inform); ?></td>
+                                            <td data-label="Active"><?php echo htmlspecialchars($active_connections); ?></td>
+                                            <td data-label="Actions">
+                                                <a href="./?genieacs&action=view&device_id=<?php echo urlencode($device_id); ?>&session=<?php echo $session; ?>" class="btn btn-primary btn-sm mr-1 mb-1">
+                                                    <i class="fa fa-eye"></i> View
+                                                </a>
+                                                <a href="./?genieacs&action=edit_wifi&device_id=<?php echo urlencode($device_id); ?>&session=<?php echo $session; ?>" class="btn btn-warning btn-sm mb-1">
+                                                    <i class="fa fa-wifi"></i> Edit WiFi
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                    <?php } // End function_exists check ?>
+                    
+                <?php elseif ($action == 'view' && !empty($device_id)): ?>
+                    <!-- Device Details -->
+                    <h4>Device Details: <?php echo htmlspecialchars(urldecode($device_id)); ?></h4>
+                    <a href="./?genieacs&action=list&session=<?php echo $session; ?>" class="btn btn-secondary mb-3">Back to List</a>
+                    
+                    <?php
+                    $device_info = genieacs_get_device_parameters($device_id);
+                    if (isset($device_info['error'])):
+                    ?>
+                        <div class="alert alert-danger">Error: <?php echo htmlspecialchars($device_info['error']); ?></div>
+                    <?php else: ?>
+                        <div class="row">
+                            <div class="col-lg-4 col-md-12">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5><i class="fa fa-info-circle"></i> Basic Information</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <?php
+                                        // Handle device info structure
+                                        $device_data = is_array($device_info) && !empty($device_info) ? $device_info[0] : (is_array($device_info) ? reset($device_info) : $device_info);
+                                        ?>
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td width="40%"><strong>Device ID:</strong></td>
+                                                <td><?php echo htmlspecialchars(urldecode($device_id)); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Manufacturer:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('InternetGatewayDevice.DeviceInfo.Manufacturer'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Model:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('InternetGatewayDevice.DeviceInfo.ModelName'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Serial Number:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('VirtualParameters.getSerialNumber', 'InternetGatewayDevice.DeviceInfo.SerialNumber'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Uptime:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('VirtualParameters.getdeviceuptime', 'InternetGatewayDevice.DeviceInfo.UpTime'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>PON Mode:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('VirtualParameters.getponmode'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Temperature:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('VirtualParameters.gettemp'))); ?><?php echo (extract_nested_value($device_data, array('VirtualParameters.gettemp')) !== 'N/A') ? '°C' : ''; ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Product Class:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('DeviceID.ProductClass'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Registered Time:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('Events.Registered'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Last Inform:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('Events.Inform'))); ?></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4 col-md-12">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5><i class="fa fa-wifi"></i> WiFi Configuration</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <?php
+                                        $wifi_params = genieacs_get_device_parameters($device_id, array(
+                                            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID',
+                                            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey',
+                                            'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'
+                                        ));
+                                        
+                                        // Handle WiFi params structure
+                                        $wifi_data = is_array($wifi_params) && !empty($wifi_params) ? $wifi_params[0] : (is_array($wifi_params) ? reset($wifi_params) : $wifi_params);
+                                        
+                                        // Debug: Print the wifi_data structure
+                                        // Uncomment the line below for debugging
+                                        // echo "<pre>" . htmlspecialchars(print_r($wifi_data, true)) . "</pre>";
+                                        ?>
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td width="40%"><strong>SSID:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($wifi_data, array('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Active Connections:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($wifi_data, array('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Hotspot:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($wifi_data, array('VirtualParameters.hotspot'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>Password:</strong></td>
+                                                <td>****</td>
+                                            </tr>
+                                        </table>
+                                        <a href="./?genieacs&action=edit_wifi&device_id=<?php echo urlencode($device_id); ?>&session=<?php echo $session; ?>" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i> Edit WiFi</a>
+                                    </div>
+                                </div>
+                                
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5><i class="fa fa-signal"></i> Optical Information</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td width="40%"><strong>RX Power:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($device_data, array('VirtualParameters.RXPower'))); ?><?php echo (extract_nested_value($device_data, array('VirtualParameters.RXPower')) !== 'N/A') ? ' dBm' : ''; ?></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4 col-md-12">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5><i class="fa fa-plug"></i> PPPoE Configuration</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <?php
+                                        $pppoe_params = genieacs_get_device_parameters($device_id, array(
+                                            'VirtualParameters.pppoeUsername',
+                                            'VirtualParameters.pppoeUsername2',
+                                            'VirtualParameters.pppoeIP',
+                                            'VirtualParameters.pppoeMac'
+                                        ));
+                                        
+                                        // Handle PPPoE params structure
+                                        $pppoe_data = is_array($pppoe_params) && !empty($pppoe_params) ? $pppoe_params[0] : (is_array($pppoe_params) ? reset($pppoe_params) : $pppoe_params);
+                                        ?>
+                                        <table class="table table-sm table-borderless">
+                                            <tr>
+                                                <td width="40%"><strong>Username:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($pppoe_data, array('VirtualParameters.pppoeUsername', 'VirtualParameters.pppoeUsername2'))); ?></td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>IP Address:</strong></td>
+                                                <td>
+                                                    <?php 
+                                                    $pppoe_ip = extract_nested_value($pppoe_data, array('VirtualParameters.pppoeIP'));
+                                                    echo htmlspecialchars($pppoe_ip);
+                                                    if ($pppoe_ip !== 'N/A'): 
+                                                    ?>
+                                                        <a href="http://<?php echo urlencode($pppoe_ip); ?>" target="_blank" class="btn btn-sm btn-outline-primary ml-2">Open</a>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>TR-069 IP:</strong></td>
+                                                <td>
+                                                    <?php 
+                                                    $tr069_ip = extract_nested_value($pppoe_data, array('VirtualParameters.IPTR069'));
+                                                    echo htmlspecialchars($tr069_ip);
+                                                    if ($tr069_ip !== 'N/A'): 
+                                                    ?>
+                                                        <a href="http://<?php echo urlencode($tr069_ip); ?>" target="_blank" class="btn btn-sm btn-outline-primary ml-2">Open</a>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td><strong>MAC Address:</strong></td>
+                                                <td><?php echo htmlspecialchars(extract_nested_value($pppoe_data, array('VirtualParameters.pppoeMac', 'VirtualParameters.PonMac'))); ?></td>
+                                            </tr>
+                                        </table>
+                                        <a href="./?genieacs&action=edit_pppoe&device_id=<?php echo urlencode($device_id); ?>&session=<?php echo $session; ?>" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i> Edit PPPoE</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                <?php elseif ($action == 'edit_wifi' && !empty($device_id)): ?>
+                    <!-- Edit WiFi -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="fa fa-wifi"></i> Edit WiFi Configuration: <?php echo htmlspecialchars(urldecode($device_id)); ?></h4>
+                        <a href="./?genieacs&action=view&device_id=<?php echo urlencode($device_id); ?>&session=<?php echo $session; ?>" class="btn btn-secondary">
+                            <i class="fa fa-arrow-left"></i> Back to Device
+                        </a>
+                    </div>
+                    
+                    <?php
+                    if (isset($_POST['save_ssid'])) {
+                        $ssid = $_POST['ssid'];
+                        
+                        $parameter_values = array(
+                            array('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $ssid, 'xsd:string')
+                        );
+                        
+                        $result = genieacs_set_device_parameters($device_id, $parameter_values);
+                        
+                        // Send notification about the change
+                        send_device_notification($device_id, 'WiFi SSID Changed', 'New SSID: ' . $ssid);
+                        
+                        if (isset($result['error'])) {
+                            echo '<div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> Error updating SSID: ' . htmlspecialchars($result['error']) . '</div>';
+                        } else {
+                            echo '<div class="alert alert-success"><i class="fa fa-check"></i> SSID updated successfully!</div>';
+                        }
+                    }
+                    
+                    if (isset($_POST['save_password'])) {
+                        $password = $_POST['password'];
+                        
+                        $parameter_values = array(
+                            array('InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey', $password, 'xsd:string')
+                        );
+                        
+                        $result = genieacs_set_device_parameters($device_id, $parameter_values);
+                        
+                        // Send notification about the change
+                        send_device_notification($device_id, 'WiFi Password Changed');
+                        
+                        if (isset($result['error'])) {
+                            echo '<div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> Error updating password: ' . htmlspecialchars($result['error']) . '</div>';
+                        } else {
+                            echo '<div class="alert alert-success"><i class="fa fa-check"></i> Password updated successfully!</div>';
+                        }
+                    }
+                    
+                    $wifi_params = genieacs_get_device_parameters($device_id, array(
+                        'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID'
+                    ));
+                    $current_ssid = isset($wifi_params[0]['InternetGatewayDevice']['LANDevice'][1]['WLANConfiguration'][1]['SSID']) ? $wifi_params[0]['InternetGatewayDevice']['LANDevice'][1]['WLANConfiguration'][1]['SSID'] : '';
+                    ?>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fa fa-wifi"></i> Edit SSID</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" action="">
+                                        <div class="form-group">
+                                            <label for="ssid"><i class="fa fa-tag"></i> SSID</label>
+                                            <input type="text" class="form-control" id="ssid" name="ssid" value="<?php echo htmlspecialchars($current_ssid); ?>" required>
+                                        </div>
+                                        <button type="submit" name="save_ssid" class="btn btn-primary">
+                                            <i class="fa fa-save"></i> Save SSID
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fa fa-lock"></i> Edit Password</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" action="">
+                                        <div class="form-group">
+                                            <label for="password"><i class="fa fa-key"></i> Password</label>
+                                            <input type="password" class="form-control" id="password" name="password" placeholder="Enter new password" required>
+                                        </div>
+                                        <button type="submit" name="save_password" class="btn btn-primary">
+                                            <i class="fa fa-save"></i> Save Password
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                <?php elseif ($action == 'edit_pppoe' && !empty($device_id)): ?>
+                    <!-- Edit PPPoE -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4><i class="fa fa-plug"></i> Edit PPPoE Configuration: <?php echo htmlspecialchars(urldecode($device_id)); ?></h4>
+                        <a href="./?genieacs&action=view&device_id=<?php echo urlencode($device_id); ?>&session=<?php echo $session; ?>" class="btn btn-secondary">
+                            <i class="fa fa-arrow-left"></i> Back to Device
+                        </a>
+                    </div>
+                    
+                    <?php
+                    if (isset($_POST['save_username'])) {
+                        $username = $_POST['username'];
+                        
+                        $parameter_values = array();
+                        if (!empty($username)) {
+                            $parameter_values[] = array('InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username', $username, 'xsd:string');
+                        }
+                        
+                        if (!empty($parameter_values)) {
+                            $result = genieacs_set_device_parameters($device_id, $parameter_values);
+                            
+                            // Send notification about the change
+                            send_device_notification($device_id, 'PPPoE Username Changed', 'New Username: ' . $username);
+                            
+                            if (isset($result['error'])) {
+                                echo '<div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> Error updating username: ' . htmlspecialchars($result['error']) . '</div>';
+                            } else {
+                                echo '<div class="alert alert-success"><i class="fa fa-check"></i> Username updated successfully!</div>';
+                            }
+                        }
+                    }
+                    
+                    if (isset($_POST['save_password'])) {
+                        $password = $_POST['password'];
+                        
+                        $parameter_values = array();
+                        if (!empty($password)) {
+                            $parameter_values[] = array('InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Password', $password, 'xsd:string');
+                        }
+                        
+                        if (!empty($parameter_values)) {
+                            $result = genieacs_set_device_parameters($device_id, $parameter_values);
+                            
+                            // Send notification about the change
+                            send_device_notification($device_id, 'PPPoE Password Changed');
+                            
+                            if (isset($result['error'])) {
+                                echo '<div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> Error updating password: ' . htmlspecialchars($result['error']) . '</div>';
+                            } else {
+                                echo '<div class="alert alert-success"><i class="fa fa-check"></i> Password updated successfully!</div>';
+                            }
+                        }
+                    }
+                    
+                    $pppoe_params = genieacs_get_device_parameters($device_id, array(
+                        'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username'
+                    ));
+                    $current_username = isset($pppoe_params[0]['InternetGatewayDevice']['WANDevice'][1]['WANConnectionDevice'][1]['WANPPPConnection'][1]['Username']) ? $pppoe_params[0]['InternetGatewayDevice']['WANDevice'][1]['WANConnectionDevice'][1]['WANPPPConnection'][1]['Username'] : '';
+                    ?>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fa fa-user"></i> Edit Username</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" action="">
+                                        <div class="form-group">
+                                            <label for="username"><i class="fa fa-tag"></i> Username</label>
+                                            <input type="text" class="form-control" id="username" name="username" value="<?php echo htmlspecialchars($current_username); ?>">
+                                        </div>
+                                        <button type="submit" name="save_username" class="btn btn-primary">
+                                            <i class="fa fa-save"></i> Save Username
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5><i class="fa fa-lock"></i> Edit Password</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" action="">
+                                        <div class="form-group">
+                                            <label for="password"><i class="fa fa-key"></i> Password</label>
+                                            <input type="password" class="form-control" id="password" name="password" placeholder="Enter new password">
+                                        </div>
+                                        <button type="submit" name="save_password" class="btn btn-primary">
+                                            <i class="fa fa-save"></i> Save Password
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php
+}
+?>
