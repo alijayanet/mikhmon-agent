@@ -436,7 +436,7 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                             <h1><?= number_format($summary['total'], 0); ?>
                                 <span style="font-size: 15px;">total</span>
                             </h1>
-                            <div><i class="fa fa-list"></i> Invoice Periode <?= htmlspecialchars($currentPeriod); ?></div>
+                            <div><i class="fa fa-list"></i> Periode <?= htmlspecialchars($currentPeriod); ?></div>
                         </div>
                     </div>
                     <div class="col-3 col-box-6">
@@ -457,10 +457,8 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                     </div>
                     <div class="col-3 col-box-6">
                         <div class="box bg-yellow bmh-75">
-                            <h1>Rp <?= number_format($summary['paid_amount'], 0, ',', '.'); ?>
-                                <span style="font-size: 15px;">revenue</span>
-                            </h1>
-                            <div><i class="fa fa-money"></i> Pendapatan Terkumpul</div>
+                            <h1><?= number_format($summary['paid_amount'], 0, ',', '.'); ?></h1>
+                            <div><i class="fa fa-money"></i> Pendapatan</div>
                         </div>
                     </div>
                 </div>
