@@ -110,7 +110,7 @@ try {
         $voucher = $voucherGen->generateVoucher();
         $username = $voucher['username'];
         $password = $voucher['password'];
-        $comment = 'Agent-' . $agentData['agent_code'] . '-' . date('dmy');
+        $comment = 'vc-agent-' . $agentData['agent_code'] . '-' . date('dmy');
         
         // Add user to MikroTik
         $API->comm("/ip/hotspot/user/add", array(
