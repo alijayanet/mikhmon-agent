@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($action === 'save_pricing') {
         $profile_id = $_POST['profile_id'] ?? 0;
-        $profile_name = $_POST['profile_name'] ?? ($_POST['profile_name_locked'] ?? '');
+        $profile_name = $_POST['profile_name'];
         $display_name = $_POST['display_name'];
         $description = $_POST['description'];
         $price = $_POST['price'];
@@ -326,7 +326,6 @@ try {
             <form method="POST" action="">
                 <input type="hidden" name="action" value="save_pricing">
                 <input type="hidden" name="profile_id" id="profile_id" value="0">
-                <input type="hidden" name="profile_name_locked" id="profile_name_locked" value="">
                 
                 <div class="modal-body">
                     <div class="form-group">
@@ -453,7 +452,6 @@ function showAddModal() {
     $('#modalTitle').text('Tambah Harga Voucher');
     $('#profile_id').val('0');
     $('#profile_name').val('').prop('disabled', false);
-    $('#profile_name_locked').val('');
     $('#display_name').val('');
     $('#description').val('');
     $('#price').val('');
@@ -473,7 +471,6 @@ function editPricing(id) {
     $('#modalTitle').text('Edit Harga Voucher');
     $('#profile_id').val(pricing.id);
     $('#profile_name').val(pricing.profile_name).prop('disabled', true);
-    $('#profile_name_locked').val(pricing.profile_name);
     $('#display_name').val(pricing.display_name);
     $('#description').val(pricing.description);
     $('#price').val(pricing.price);

@@ -42,94 +42,17 @@ $typeFilter = trim($_GET['type'] ?? '');
 $searchQuery = trim($_GET['q'] ?? '');
 
 // Fetch filter options
-$brands = array();
-$categories = array();
-$types = array('prepaid', 'postpaid');
-
-try {
-    $brands = $pdo->query("SELECT DISTINCT brand FROM digiflazz_products WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
+$brands = $pdo->query("SELECT DISTINCT brand FROM digiflazz_products WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
+              ->fetchAll(PDO::FETCH_COLUMN);
+$categories = $pdo->query("SELECT DISTINCT category FROM digiflazz_products WHERE category IS NOT NULL AND category != '' ORDER BY category")
                   ->fetchAll(PDO::FETCH_COLUMN);
-    $categories = $pdo->query("SELECT DISTINCT category FROM digiflazz_products WHERE category IS NOT NULL AND category != '' ORDER BY category")
-                      ->fetchAll(PDO::FETCH_COLUMN);
-} catch (Exception $e) {
-    // Handle database errors gracefully
-    $brands = array();
-    $categories = array();
-}
+$types = ['prepaid', 'postpaid'];
 
-// Define category cards based on actual database categories and Digiflazz standards
-$categoryCards = array(
-    'Pulsa' => array('label' => 'PULSA', 'icon' => 'fa-mobile', 'color' => '#3b82f6'),
-    'Data' => array('label' => 'DATA', 'icon' => 'fa-wifi', 'color' => '#10b981'),
-    'Games' => array('label' => 'GAMES', 'icon' => 'fa-gamepad', 'color' => '#8b5cf6'),
-    'PLN' => array('label' => 'PLN', 'icon' => 'fa-bolt', 'color' => '#f59e0b'),
-    'TV' => array('label' => 'TV', 'icon' => 'fa-tv', 'color' => '#06b6d4'),
-    'Pascabayar' => array('label' => 'PASCABAYAR', 'icon' => 'fa-calendar', 'color' => '#64748b'),
-    'E-Money' => array('label' => 'E-MONEY', 'icon' => 'fa-credit-card', 'color' => '#10b981'),
-    'Voucher' => array('label' => 'VOUCHER', 'icon' => 'fa-ticket', 'color' => '#8b5cf6'),
-    'Aktivasi Voucher' => array('label' => 'AKTIVASI VOUCHER', 'icon' => 'fa-ticket', 'color' => '#8b5cf6'),
-    'Masa Aktif' => array('label' => 'MASA AKTIF', 'icon' => 'fa-clock-o', 'color' => '#f59e0b'),
-    'Paket SMS & Telpon' => array('label' => 'PAKET SMS & TELPON', 'icon' => 'fa-phone', 'color' => '#3b82f6'),
-    // Additional Digiflazz standard categories
-    'BPJS' => array('label' => 'BPJS', 'icon' => 'fa-heartbeat', 'color' => '#ef4444'),
-    'PDAM' => array('label' => 'PDAM', 'icon' => 'fa-tint', 'color' => '#0ea5e9'),
-    'Multifinance' => array('label' => 'MULTIFINANCE', 'icon' => 'fa-building', 'color' => '#64748b'),
-    'Internet' => array('label' => 'INTERNET', 'icon' => 'fa-globe', 'color' => '#10b981'),
-    'Telkom' => array('label' => 'TELKOM', 'icon' => 'fa-phone', 'color' => '#3b82f6')
-);
-
-// Add Digiflazz standard categories that might not be in our database yet but could be added
-$digiflazzStandardCategories = array(
-    'PGN' => array('label' => 'PGN', 'icon' => 'fa-fire', 'color' => '#f59e0b'),
-    'PBB' => array('label' => 'PBB', 'icon' => 'fa-home', 'color' => '#8b5cf6')
-);
-
-// Merge standard categories with our existing ones
-foreach ($digiflazzStandardCategories as $key => $data) {
-    if (!isset($categoryCards[$key])) {
-        $categoryCards[$key] = $data;
-    }
-}
-
-// Filter category cards to only show ones that have products in the database
-$availableCategories = array();
-try {
-    // Check which predefined categories have products using exact matching
-    foreach ($categoryCards as $catKey => $catData) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM digiflazz_products WHERE status = 'active' AND category = ?");
-        $stmt->execute(array($catKey));
-        $count = $stmt->fetchColumn();
-        if ($count > 0) {
-            $availableCategories[$catKey] = $catData;
-        }
-    }
-    
-    // Also check for any other categories in the database that might not be in our predefined list
-    $stmt = $pdo->query("SELECT DISTINCT category FROM digiflazz_products WHERE status = 'active' AND category IS NOT NULL AND category != ''");
-    $allCategories = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    // Add any missing categories with default styling
-    foreach ($allCategories as $category) {
-        // Check if category is already in our available categories
-        if (!isset($availableCategories[$category])) {
-            $availableCategories[$category] = array(
-                'label' => $category,
-                'icon' => 'fa-tag',
-                'color' => '#64748b'
-            );
-        }
-    }
-} catch (Exception $e) {
-    // If there's an error with category filtering, show all predefined categories
-    $availableCategories = $categoryCards;
-}
-
-$filtersApplied = array();
+$filtersApplied = [];
 $sql = "SELECT * FROM digiflazz_products WHERE status = 'active'";
-$params = array();
+$params = [];
 
 if ($categoryFilter !== '') {
-    // Use exact matching for category filter
     $sql .= " AND category = :category";
     $params[':category'] = $categoryFilter;
     $filtersApplied['category'] = $categoryFilter;
@@ -154,53 +77,44 @@ if ($searchQuery !== '') {
 }
 
 $sql .= " ORDER BY brand, product_name LIMIT 200";
-$products = array();
-$totalProducts = 0;
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if (!empty($products)) {
+    $markupForSort = (int)($markupNominal ?? 0);
 
-try {
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    if (!empty($products)) {
-        $markupForSort = (int)($markupNominal ?? 0);
+    usort($products, function (array $a, array $b) use ($markupForSort) {
+        $priceA = (int)($a['seller_price'] ?? 0);
+        $priceB = (int)($b['seller_price'] ?? 0);
 
-        usort($products, function (array $a, array $b) use ($markupForSort) {
-            $priceA = (int)($a['seller_price'] ?? 0);
-            $priceB = (int)($b['seller_price'] ?? 0);
-
+        if ($priceA <= 0) {
+            $priceA = (int)($a['price'] ?? 0);
             if ($priceA <= 0) {
-                $priceA = (int)($a['price'] ?? 0);
-                if ($priceA <= 0) {
-                    $priceA = (int)($a['buyer_price'] ?? 0);
-                }
-                if ($priceA > 0 && $markupForSort > 0) {
-                    $priceA += $markupForSort;
-                }
+                $priceA = (int)($a['buyer_price'] ?? 0);
             }
+            if ($priceA > 0 && $markupForSort > 0) {
+                $priceA += $markupForSort;
+            }
+        }
 
+        if ($priceB <= 0) {
+            $priceB = (int)($b['price'] ?? 0);
             if ($priceB <= 0) {
-                $priceB = (int)($b['price'] ?? 0);
-                if ($priceB <= 0) {
-                    $priceB = (int)($b['buyer_price'] ?? 0);
-                }
-                if ($priceB > 0 && $markupForSort > 0) {
-                    $priceB += $markupForSort;
-                }
+                $priceB = (int)($b['buyer_price'] ?? 0);
             }
-
-            if ($priceA === $priceB) {
-                return strcmp($a['product_name'] ?? '', $b['product_name'] ?? '');
+            if ($priceB > 0 && $markupForSort > 0) {
+                $priceB += $markupForSort;
             }
+        }
 
-            return ($priceA <=> $priceB);
-        });
-    }
-    $totalProducts = count($products);
-} catch (Exception $e) {
-    $products = array();
-    $totalProducts = 0;
+        if ($priceA === $priceB) {
+            return strcmp($a['product_name'] ?? '', $b['product_name'] ?? '');
+        }
+
+        return ($priceA <=> $priceB);
+    });
 }
+$totalProducts = count($products);
 
 include_once('include_head.php');
 include_once('include_nav.php');
@@ -629,71 +543,6 @@ include_once('include_nav.php');
     border-radius: 999px;
     font-size: 11px;
 }
-
-/* Category Cards Styles */
-.category-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.category-card {
-    border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 20px 10px;
-    background: #fff;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.category-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.category-card i {
-    font-size: 32px;
-    margin-bottom: 10px;
-}
-
-.category-card .product-name {
-    font-size: 14px;
-    font-weight: 600;
-    text-align: center;
-    margin: 0;
-}
-
-@media (max-width: 768px) {
-    .category-card-grid {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        gap: 10px;
-    }
-    
-    .category-card {
-        padding: 15px 5px;
-    }
-    
-    .category-card i {
-        font-size: 24px;
-        margin-bottom: 8px;
-    }
-    
-    .category-card .product-name {
-        font-size: 12px;
-    }
-}
-
-.dark .category-card {
-    background: #1f2937;
-    border: 1px solid #374151;
-    color: #e2e8f0;
-}
 </style>
 
 <div class="row">
@@ -702,16 +551,16 @@ include_once('include_nav.php');
             <div class="card-header digital-products-header">
                 <div>
                     <h3><i class="fa fa-plug"></i> Digital Products (Digiflazz)</h3>
-                    <div>Saldo Anda: <strong id="agentBalance">Rp <?php echo number_format($balance, 0, ',', '.'); ?></strong></div>
+                    <div>Saldo Anda: <strong id="agentBalance">Rp <?= number_format($balance, 0, ',', '.'); ?></strong></div>
                 </div>
                 <form class="d-flex" method="get" style="gap:10px;">
-                    <input type="text" name="q" class="form-control" placeholder="Cari produk atau SKU" value="<?php echo htmlspecialchars($searchQuery); ?>">
+                    <input type="text" name="q" class="form-control" placeholder="Cari produk atau SKU" value="<?= htmlspecialchars($searchQuery); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> Cari</button>
                 </form>
             </div>
             <div class="card-body">
                 <?php if ($digiflazzError): ?>
-                    <div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> <?php echo htmlspecialchars($digiflazzError); ?></div>
+                    <div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> <?= htmlspecialchars($digiflazzError); ?></div>
                 <?php elseif (!$digiflazzEnabled): ?>
                     <div class="alert alert-warning">
                         <i class="fa fa-info-circle"></i> Integrasi Digiflazz belum dikonfigurasi. Hubungi administrator untuk mengaktifkan fitur ini.
@@ -720,31 +569,10 @@ include_once('include_nav.php');
                     <div class="summary-cards">
                         <div class="summary-card">
                             <h4>Produk Tersedia</h4>
-                            <div class="value"><?php echo number_format($totalProducts); ?></div>
+                            <div class="value"><?= number_format($totalProducts); ?></div>
                             <small>Filter otomatis menampilkan maksimal 200 produk.</small>
                         </div>
                     </div>
-
-                    <?php if (empty($categoryFilter) && empty($brandFilter) && empty($typeFilter) && empty($searchQuery)): ?>
-                    <!-- Category Cards -->
-                    <div class="category-card-grid">
-                        <?php foreach ($availableCategories as $catKey => $catData): ?>
-                        <div class="category-card" onclick="window.location.href='?category=<?php echo urlencode($catKey); ?>'">
-                            <div style="color: <?php echo $catData['color']; ?>;">
-                                <i class="fa <?php echo $catData['icon']; ?>"></i>
-                            </div>
-                            <div class="product-name"><?php echo htmlspecialchars($catData['label']); ?></div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php else: ?>
-                    <!-- Back to Category Cards Button -->
-                    <div style="margin: 15px 0;">
-                        <a href="digital_products.php" class="btn btn-secondary">
-                            <i class="fa fa-arrow-left"></i> Kembali ke Kategori
-                        </a>
-                    </div>
-                    <?php endif; ?>
 
                     <form method="get" class="filter-grid">
                         <div>
@@ -752,7 +580,7 @@ include_once('include_nav.php');
                             <select name="brand" class="form-control">
                                 <option value="">Semua Brand</option>
                                 <?php foreach ($brands as $brand): ?>
-                                <option value="<?php echo htmlspecialchars($brand); ?>" <?php echo $brand === $brandFilter ? 'selected' : ''; ?>><?php echo htmlspecialchars($brand); ?></option>
+                                <option value="<?= htmlspecialchars($brand); ?>" <?= $brand === $brandFilter ? 'selected' : ''; ?>><?= htmlspecialchars($brand); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -761,7 +589,7 @@ include_once('include_nav.php');
                             <select name="category" class="form-control">
                                 <option value="">Semua Kategori</option>
                                 <?php foreach ($categories as $category): ?>
-                                <option value="<?php echo htmlspecialchars($category); ?>" <?php echo $category === $categoryFilter ? 'selected' : ''; ?>><?php echo htmlspecialchars($category); ?></option>
+                                <option value="<?= htmlspecialchars($category); ?>" <?= $category === $categoryFilter ? 'selected' : ''; ?>><?= htmlspecialchars($category); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -770,7 +598,7 @@ include_once('include_nav.php');
                             <select name="type" class="form-control">
                                 <option value="">Semua Tipe</option>
                                 <?php foreach ($types as $type): ?>
-                                <option value="<?php echo $type; ?>" <?php echo $type === $typeFilter ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option>
+                                <option value="<?= $type; ?>" <?= $type === $typeFilter ? 'selected' : ''; ?>><?= ucfirst($type); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -785,12 +613,7 @@ include_once('include_nav.php');
 
                     <?php if ($totalProducts === 0): ?>
                         <div class="alert-note">
-                            <?php if (!empty($categoryFilter)): ?>
-                                Tidak ada produk dalam kategori "<?php echo htmlspecialchars($categoryFilter); ?>".
-                            <?php else: ?>
-                                Tidak ada produk yang cocok dengan filter Anda.
-                            <?php endif; ?>
-                            Coba ubah filter atau lakukan sinkronisasi ulang daftar produk melalui panel admin.
+                            Tidak ada produk yang cocok dengan filter Anda. Coba ubah filter atau lakukan sinkronisasi ulang daftar produk melalui panel admin.
                         </div>
                     <?php else: ?>
                         <div class="product-grid">
@@ -814,29 +637,29 @@ include_once('include_nav.php');
                             ?>
                             <div class="product-card">
                                 <div>
-                                    <div class="product-brand"><?php echo htmlspecialchars($brand); ?></div>
-                                    <div class="product-name"><?php echo htmlspecialchars($product['product_name']); ?></div>
-                                    <div class="product-sku">SKU: <?php echo htmlspecialchars($product['buyer_sku_code']); ?></div>
+                                    <div class="product-brand"><?= htmlspecialchars($brand); ?></div>
+                                    <div class="product-name"><?= htmlspecialchars($product['product_name']); ?></div>
+                                    <div class="product-sku">SKU: <?= htmlspecialchars($product['buyer_sku_code']); ?></div>
                                 </div>
                                 <div class="product-meta">
-                                    <span class="badge-brand">Brand: <?php echo htmlspecialchars($brand); ?></span>
-                                    <span class="badge-type"><?php echo strtoupper($type); ?></span>
-                                    <span>Kategori: <?php echo htmlspecialchars($category); ?></span>
+                                    <span class="badge-brand">Brand: <?= htmlspecialchars($brand); ?></span>
+                                    <span class="badge-type"><?= strtoupper($type); ?></span>
+                                    <span>Kategori: <?= htmlspecialchars($category); ?></span>
                                 </div>
                                 <div class="product-price">
                                     <span>Harga Dasar</span>
-                                    <strong>Rp <?php echo number_format($displayPrice, 0, ',', '.'); ?></strong>
+                                    <strong>Rp <?= number_format($displayPrice, 0, ',', '.'); ?></strong>
                                 </div>
                                 <div class="product-actions">
                                     <button
                                         class="btn-order"
-                                        data-product-id="<?php echo (int)$product['id']; ?>"
-                                        data-product-name="<?php echo htmlspecialchars($product['product_name']); ?>"
-                                        data-product-sku="<?php echo htmlspecialchars($product['buyer_sku_code']); ?>"
-                                        data-cost-price="<?php echo $costPrice; ?>"
-                                        data-display-price="<?php echo $displayPrice; ?>"
-                                        data-product-brand="<?php echo htmlspecialchars($brand); ?>"
-                                        data-product-type="<?php echo htmlspecialchars($type); ?>"
+                                        data-product-id="<?= (int)$product['id']; ?>"
+                                        data-product-name="<?= htmlspecialchars($product['product_name']); ?>"
+                                        data-product-sku="<?= htmlspecialchars($product['buyer_sku_code']); ?>"
+                                        data-cost-price="<?= $costPrice; ?>"
+                                        data-display-price="<?= $displayPrice; ?>"
+                                        data-product-brand="<?= htmlspecialchars($brand); ?>"
+                                        data-product-type="<?= htmlspecialchars($type); ?>"
                                         >
                                         <i class="fa fa-shopping-cart"></i> Order
                                     </button>
@@ -862,7 +685,7 @@ include_once('include_nav.php');
         </div>
         <form id="orderForm">
             <input type="hidden" name="product_id" id="orderProductId">
-            <input type="hidden" name="agent_token" value="<?php echo htmlspecialchars($_SESSION['agent_token'] ?? ''); ?>">
+            <input type="hidden" name="agent_token" value="<?= htmlspecialchars($_SESSION['agent_token'] ?? ''); ?>">
             <div class="form-group">
                 <label>Nomor Tujuan (MSISDN)</label>
                 <input type="text" name="customer_no" id="orderCustomerNo" class="form-control" maxlength="20" required placeholder="Contoh: 081234567890">
