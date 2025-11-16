@@ -119,19 +119,28 @@ graph TB
 
 ### Instalasi Cepat (4 Langkah)
 
-1. Upload file zip yang sudah di download
-2. extax dari file hosting
-3. move semua file saat beda folder
-Siapkan database – pilihan import 
-mikhmon_billing.sql
- atau 
-mikhmon_fix.sql
-, plus instruksi menjalankan 
-https://domain/fix_all_modules.php
-.
-Konfigurasi koneksi – edit 
-include/db_config.php
- dan penyesuaian jika memakai subfolder.
+1. **Upload Files**
+   ```bash
+   git clone https://github.com/alijayanet/mikhmon-agent.git
+   ```
+
+2. **Buat Database**
+   ```sql
+   CREATE DATABASE mikhmon_agents CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+3. **Konfigurasi Database**
+   Edit file `include/db_config.php`:
+   ```php
+   define('DB_HOST', 'localhost');
+   define('DB_USER', 'your_db_user');
+   define('DB_PASS', 'your_db_password');
+   define('DB_NAME', 'mikhmon_agents');
+   ```
+
+4. **Run Installer**
+   Akses `http://your-domain/install_database_bulletproof.php` dan ikuti petunjuknya.
+
 ### Konfigurasi Tambahan
 
 #### WhatsApp Integration
@@ -195,9 +204,6 @@ Project Link: [https://github.com/alijayanet/mikhmon-agent](https://github.com/a
   Made with ❤️ by Ali Jaya Net
 
 </p>
-
-
-
 
 
 
