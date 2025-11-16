@@ -97,10 +97,28 @@ if (!class_exists('SimpleXLSX')) {
             }
 
             foreach ($workbookXml->sheets->sheet as $sheet) {
-                $path = 'xl/worksheets/' . basename((string)$sheet['r:id'], 'rId') . '.xml';
-                $target = $this->findWorksheetPath((string)$sheet['r:id']);
-                $name = $target ?? $path;
-                $sheetContent = $this->zip->getFromName($name);
+                // Perbaikan: Gunakan path default yang lebih aman
+                $relationId = (string)$sheet['r:id'];
+                $sheetContent = false;
+                
+                if (!empty($relationId)) {
+                    // Jika ada relationId, gunakan metode pencarian yang ada
+                    $target = $this->findWorksheetPath($relationId);
+                    if ($target !== null) {
+                        $sheetContent = $this->zip->getFromName($target);
+                    }
+                }
+                
+                // Jika belum berhasil, coba path default
+                if ($sheetContent === false) {
+                    $sheetContent = $this->zip->getFromName('xl/worksheets/sheet1.xml');
+                }
+                
+                // Jika masih belum berhasil, coba metode alternatif
+                if ($sheetContent === false) {
+                    $sheetContent = $this->zip->getFromName('xl/worksheets/sheet.xml');
+                }
+                
                 if ($sheetContent !== false) {
                     $sheetXml = simplexml_load_string($sheetContent); 
                     if ($sheetXml) {

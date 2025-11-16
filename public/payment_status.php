@@ -416,8 +416,8 @@ $status_info = $status_labels[$transaction['status']] ?? ['label' => 'Unknown', 
             
             <!-- Action Buttons -->
             <div class="text-center" style="margin-top: 25px;">
-                <button class="btn-action" onclick="printVoucher()">
-                    <i class="fa fa-print"></i> Print A4
+                <button class="btn-action" onclick="copyVoucherToClipboard()">
+                    <i class="fa fa-copy"></i> Copy/Salin
                 </button>
                 <button class="btn-action btn-secondary" onclick="printThermal()">
                     <i class="fa fa-print"></i> Print Thermal
@@ -557,6 +557,34 @@ $status_info = $status_labels[$transaction['status']] ?? ['label' => 'Unknown', 
             document.body.removeChild(textarea);
             alert(label + ' berhasil disalin!');
         }
+    }
+    
+    // Copy Voucher to Clipboard
+    function copyVoucherToClipboard() {
+        const username = '<?= htmlspecialchars($transaction['voucher_code']); ?>';
+        const password = '<?= htmlspecialchars($transaction['voucher_password']); ?>';
+        const profile = '<?= htmlspecialchars($transaction['profile_name']); ?>';
+        
+        // Create a formatted text version of the voucher
+        const voucherText = `
+VOUCHER WiFi
+
+Paket: ${profile}
+
+Username: ${username}
+Password: ${password}
+
+Scan QR Code atau masukkan username & password untuk login
+`;
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(voucherText).then(() => {
+            // Show success message
+            alert('Voucher berhasil disalin ke clipboard!');
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            alert('Gagal menyalin ke clipboard. Silakan coba lagi.');
+        });
     }
     
     // Print Voucher A4

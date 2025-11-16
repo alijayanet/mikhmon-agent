@@ -235,10 +235,12 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
         $snapshotStatus = $deviceSnapshot['status'] ?? null;
         $statusLabel = $snapshotStatus ? strtoupper($snapshotStatus) : 'TIDAK DIKETAHUI';
         $statusClass = $snapshotStatus === 'online' ? 'online' : ($snapshotStatus === 'offline' ? 'offline' : '');
-        $connectedDevices = $deviceSnapshot['connected_devices'];
+        $connectedDevices = $deviceSnapshot['connected_devices'] ?? null;
         $connectedLabel = $connectedDevices !== null ? $connectedDevices : 'N/A';
-        $rxPowerRaw = $deviceSnapshot['rx_power'];
+        $rxPowerRaw = $deviceSnapshot['rx_power'] ?? null;
         $rxLabel = ($rxPowerRaw !== null && $rxPowerRaw !== 'N/A' && $rxPowerRaw !== '') ? $rxPowerRaw . ' dBm' : 'N/A';
+        $temperatureRaw = $deviceSnapshot['temperature'] ?? null;
+        $temperatureLabel = ($temperatureRaw !== null && $temperatureRaw !== 'N/A' && $temperatureRaw !== '') ? $temperatureRaw . '°C' : 'N/A';
         $pppoeLabel = $deviceSnapshot['pppoe_username'] ?? 'N/A';
         ?>
         <div class="card">
@@ -267,6 +269,13 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
                         <div class="value"><?= htmlspecialchars($rxLabel); ?></div>
                         <small style="color:#6b7280;">Semakin dekat ke 0 dBm semakin baik</small>
                     </div>
+                    <?php if ($temperatureLabel !== 'N/A'): ?>
+                    <div class="device-stat">
+                        <div class="label">Suhu Perangkat</div>
+                        <div class="value"><?= htmlspecialchars($temperatureLabel); ?></div>
+                        <small style="color:#6b7280;">Suhu perangkat saat ini</small>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

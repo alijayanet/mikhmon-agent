@@ -107,6 +107,14 @@ class BillingService
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getProfileIdByName(string $name): ?int
+    {
+        $stmt = $this->db->prepare("SELECT id FROM billing_profiles WHERE profile_name = :name LIMIT 1");
+        $stmt->execute([':name' => $name]);
+        $id = $stmt->fetchColumn();
+        return $id === false ? null : (int)$id;
+    }
+
     public function getActiveCustomersWithProfile(): array
     {
         $stmt = $this->db->query(
@@ -199,6 +207,17 @@ class BillingService
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllCustomersWithProfile(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT bc.*, bp.profile_name
+             FROM billing_customers bc
+             LEFT JOIN billing_profiles bp ON bc.profile_id = bp.id
+             ORDER BY bc.name ASC"
+        );
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -1049,15 +1068,20 @@ class BillingService
             'device_id' => $deviceId,
             'pppoe_username' => $customer['genieacs_pppoe_username'] ?? 'N/A',
             'connected_devices' => null,
-                $parsed = GenieACS_Fast::parseDeviceDataFast($response['data']);
-                $snapshot['pppoe_username'] = $parsed['pppoe_username'] ?? $snapshot['pppoe_username'];
-                $snapshot['connected_devices'] = $parsed['connected_devices_count'] ?? null;
-                $snapshot['rx_power'] = $parsed['rx_power'] ?? null;
-                $snapshot['status'] = $parsed['status'] ?? null;
-                $snapshot['temperature'] = $parsed['temperature'] ?? null;
-            } catch (Throwable $e) {
-                // Ignore parsing errors and fall back to defaults.
-            }
+            'rx_power' => null,
+            'status' => null,
+            'temperature' => null,
+        ];
+
+        try {
+            $parsed = GenieACS_Fast::parseDeviceDataFast($response['data']);
+            $snapshot['pppoe_username'] = $parsed['pppoe_username'] ?? $snapshot['pppoe_username'];
+            $snapshot['connected_devices'] = $parsed['connected_devices_count'] ?? null;
+            $snapshot['rx_power'] = $parsed['rx_power'] ?? null;
+            $snapshot['status'] = $parsed['status'] ?? null;
+            $snapshot['temperature'] = $parsed['temperature'] ?? null;
+        } catch (Throwable $e) {
+            // Ignore parsing errors and fall back to defaults.
         }
 
         return $snapshot;
