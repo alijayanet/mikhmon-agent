@@ -88,39 +88,6 @@ class WhatsAppNotification {
     }
 
     /**
-     * Normalize result from sendMessage to boolean
-     */
-    private function normalizeResult($result): bool
-    {
-        if (is_bool($result)) {
-            return $result;
-        }
-
-        if (is_array($result)) {
-            if (isset($result['success'])) {
-                return (bool)$result['success'];
-            }
-            if (isset($result['status'])) {
-                $status = strtolower((string)$result['status']);
-                return in_array($status, ['ok', 'success', 'sent', 'true', '1'], true);
-            }
-        }
-
-        if (is_numeric($result)) {
-            return (bool)$result;
-        }
-
-        if (is_string($result)) {
-            $normalized = strtolower(trim($result));
-            if (in_array($normalized, ['ok', 'success', 'sent', 'true', '1'], true)) {
-                return true;
-            }
-        }
-
-        return !empty($result);
-    }
-
-    /**
      * Send plain WhatsApp message without additional formatting helpers.
      */
     public function sendPlainMessage(string $phone, string $message): bool
@@ -183,8 +150,7 @@ class WhatsAppNotification {
         $content .= "Contoh: TOPUP 100000";
         
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($agent['phone'], $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($agent['phone'], $message);
     }
     
     /**
@@ -218,8 +184,7 @@ class WhatsAppNotification {
         // Send to all admin numbers
         $results = [];
         foreach ($adminNumbers as $adminPhone) {
-            $result = $this->sendMessage($adminPhone, $message);
-            $results[] = $this->normalizeResult($result);
+            $results[] = $this->sendMessage($adminPhone, $message);
         }
         
         return in_array(true, $results);
@@ -236,8 +201,7 @@ class WhatsAppNotification {
         $content .= "Silakan hubungi admin untuk perpanjangan.";
         
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($phone, $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($phone, $message);
     }
     
     /**
@@ -260,8 +224,7 @@ class WhatsAppNotification {
         $content .= "Ketik: *GEN <PROFILE> <QTY>*";
         
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($agent['phone'], $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($agent['phone'], $message);
     }
     
     /**
@@ -297,8 +260,7 @@ class WhatsAppNotification {
         $content .= "Rp " . number_format($agent['balance'], 0, ',', '.');
         
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($agent['phone'], $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($agent['phone'], $message);
     }
     
     /**
@@ -336,65 +298,6 @@ class WhatsAppNotification {
         ];
     }
     
-    /**
-     * Notify customer about successful Digiflazz transaction
-     */
-    public function notifyCustomerDigiflazzSuccess(string $customerPhone, array $transactionData): bool
-    {
-        if (empty($customerPhone)) {
-            return false;
-        }
-
-        $productName = $transactionData['product_name'] ?? '-';
-        $customerNo = $transactionData['customer_no'] ?? '-';
-        $customerName = $transactionData['customer_name'] ?? 'Pelanggan';
-        $statusRaw = strtoupper($transactionData['status'] ?? 'PENDING');
-        $message = $transactionData['message'] ?? '';
-        $refId = $transactionData['ref_id'] ?? '-';
-        $serialNumber = $transactionData['serial_number'] ?? '';
-        $price = (int)($transactionData['price'] ?? 0);
-
-        $icon = '⚡';
-        if (in_array($statusRaw, ['SUCCESS', 'SUCCES', 'SUKSES'])) {
-            $icon = '✅';
-        } elseif (in_array($statusRaw, ['FAILED', 'GAGAL', 'FAILED'])) {
-            $icon = '❌';
-        } elseif (in_array($statusRaw, ['PENDING', 'PROCESS', 'PROCESSING', 'MENUNGGU'])) {
-            $icon = '⏳';
-        }
-
-        $content  = "{$icon} *TRANSAKSI BERHASIL*\n\n";
-        $content .= "Halo *{$customerName}*!\n";
-        $content .= "Transaksi pembayaran digital Anda telah berhasil diproses.\n\n";
-        $content .= "━━━━━━━━━━━━━━━━━━━━\n\n";
-        $content .= "Produk : *{$productName}*\n";
-        $content .= "Nomor  : `{$customerNo}`\n";
-        if (!empty($message)) {
-            $content .= "Pesan  : {$message}\n";
-        }
-        $content .= "Ref ID : {$refId}\n";
-        if (!empty($serialNumber)) {
-            $content .= "SN     : `{$serialNumber}`\n";
-        }
-        $content .= "Biaya  : Rp " . number_format($price, 0, ',', '.') . "\n\n";
-        $content .= "━━━━━━━━━━━━━━━━━━━━\n\n";
-        $content .= "Terima kasih telah menggunakan layanan kami.";
-
-        $messageFormatted = $this->formatMessage($content);
-        $result = $this->sendMessage($customerPhone, $messageFormatted);
-        
-        // Handle different return types from sendMessage
-        if (is_bool($result)) {
-            return $result;
-        }
-        
-        if (is_array($result) && isset($result['success'])) {
-            return (bool)$result['success'];
-        }
-        
-        return !empty($result);
-    }
-
     /**
      * Notify agent about successful Digiflazz transaction
      */
@@ -445,8 +348,7 @@ class WhatsAppNotification {
         $content .= "Saldo tersisa: Rp " . number_format($balanceValue, 0, ',', '.');
 
         $messageFormatted = $this->formatMessage($content);
-        $result = $this->sendMessage($agent['phone'], $messageFormatted);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($agent['phone'], $messageFormatted);
     }
 
     /**
@@ -473,8 +375,7 @@ class WhatsAppNotification {
 
         $message = str_replace(array_keys($replacements), array_values($replacements), $template);
         $message = $this->formatMessage($message);
-        $result = $this->sendMessage($phone, $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($phone, $message);
     }
 
     /**
@@ -501,8 +402,7 @@ class WhatsAppNotification {
         );
 
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($phone, $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($phone, $message);
     }
 
     /**
@@ -527,8 +427,7 @@ class WhatsAppNotification {
         );
 
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($phone, $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($phone, $message);
     }
 
     /**
@@ -556,8 +455,7 @@ class WhatsAppNotification {
         );
 
         $message = $this->formatMessage($content);
-        $result = $this->sendMessage($phone, $message);
-        return $this->normalizeResult($result);
+        return $this->sendMessage($phone, $message);
     }
 
     /**
