@@ -35,6 +35,13 @@ function saveBillingSetting(PDO $db, string $key, $value): void {
 $error = '';
 $success = '';
 
+// Tampilkan pesan sukses/error jika ada
+if (isset($_GET['success']) && $_GET['success'] == '1') {
+    $success = 'Pengaturan billing berhasil disimpan!';
+} elseif (isset($_GET['error']) && !empty($_GET['error'])) {
+    $error = 'Gagal menyimpan pengaturan: ' . htmlspecialchars($_GET['error']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $db->beginTransaction();
@@ -69,13 +76,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             saveBillingSetting($db, 'billing_portal_otp_max_attempts', (string)$otpAttempts);
         }
 
+        if (isset($_POST['save_billing_reminder_settings'])) {
+            $reminderTemplate = trim($_POST['billing_reminder_template'] ?? '');
+            $reminderDays = trim($_POST['billing_reminder_days_before'] ?? '');
+            $isolationDelay = (int)($_POST['billing_isolation_delay'] ?? 1);
+
+            // Validasi format hari reminder
+            if (!empty($reminderDays)) {
+                $daysArray = array_map('trim', explode(',', $reminderDays));
+                $validDays = [];
+                foreach ($daysArray as $day) {
+                    if (is_numeric($day) && $day > 0) {
+                        $validDays[] = (int)$day;
+                    }
+                }
+                $reminderDays = implode(',', $validDays);
+            }
+
+            $isolationDelay = max(0, min(30, $isolationDelay));
+
+            saveBillingSetting($db, 'billing_reminder_template', $reminderTemplate);
+            saveBillingSetting($db, 'billing_reminder_days_before', $reminderDays);
+            saveBillingSetting($db, 'billing_isolation_delay', (string)$isolationDelay);
+        }
+
         $db->commit();
-        $success = 'Pengaturan billing berhasil disimpan!';
+        // Redirect dengan pesan sukses
+        header('Location: ?hotspot=billing-settings&session=' . urlencode($_GET['session'] ?? '') . '&success=1');
+        exit();
     } catch (Exception $e) {
         if ($db->inTransaction()) {
             $db->rollBack();
         }
-        $error = 'Gagal menyimpan pengaturan: ' . htmlspecialchars($e->getMessage());
+        // Redirect dengan pesan error
+        $errorMessage = urlencode($e->getMessage());
+        header('Location: ?hotspot=billing-settings&session=' . urlencode($_GET['session'] ?? '') . '&error=' . $errorMessage);
+        exit();
     }
 }
 
@@ -146,6 +182,16 @@ $paymentGateways = $db->query(
             <div class="card-header">
                 <h3><i class="fa fa-cog"></i> Pengaturan Billing</h3>
             </div>
+            <?php if (!empty($success)): ?>
+                <div class="alert alert-success" style="margin: 20px;">
+                    <i class="fa fa-check-circle"></i> <?= htmlspecialchars($success); ?>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($error)): ?>
+                <div class="alert alert-danger" style="margin: 20px;">
+                    <i class="fa fa-exclamation-circle"></i> <?= htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
 </div>
             <div class="card-body">
                 <div class="settings-grid">
@@ -245,28 +291,26 @@ $paymentGateways = $db->query(
                 </div>
 
                 <div class="placeholder-form">
-                    <h4 style="margin-top:0;"><i class="fa fa-edit"></i> Form Pengaturan (placeholder)</h4>
-                    <p>API penyimpanan pengaturan billing akan menulis ke tabel <code>billing_settings</code> tanpa menduplikasi konfigurasi gateway. Nilai yang umum:</p>
-                    <ul style="padding-left:18px;">
-                        <li><code>billing_reminder_template</code> – format pesan WhatsApp.</li>
-                        <li><code>billing_reminder_days_before</code> – daftar hari sebelum jatuh tempo (mis. "3,1").</li>
-                        <li><code>billing_isolation_delay</code> – grace period sebelum isolasi.</li>
-                    </ul>
-                    <form>
+                    <h4 style="margin-top:0;"><i class="fa fa-edit"></i> Pengaturan Reminder Billing</h4>
+                    <p>API penyimpanan pengaturan billing akan menulis ke tabel <code>billing_settings</code> tanpa menduplikasi konfigurasi gateway.</p>
+                    <form method="post">
+                        <input type="hidden" name="save_billing_reminder_settings" value="1">
                         <div class="form-group">
                             <label>Template Pesan WhatsApp</label>
-                            <textarea class="form-control" rows="4" disabled><?= htmlspecialchars($billingSettings['billing_reminder_template'] ?? "Halo {{nama}}, tagihan Wifi {{periode}} sebesar Rp {{total}}. Mohon bayar sebelum {{jatuh_tempo}}."); ?></textarea>
+                            <textarea name="billing_reminder_template" class="form-control" rows="4"><?= htmlspecialchars($billingSettings['billing_reminder_template'] ?? "Halo {{nama}}, tagihan Wifi {{periode}} sebesar Rp {{total}}. Mohon bayar sebelum {{jatuh_tempo}}."); ?></textarea>
+                            <small>Placeholder: {{nama}}, {{periode}}, {{total}}, {{jatuh_tempo}}</small>
                         </div>
                         <div class="form-group">
                             <label>Hari Reminder</label>
-                            <input type="text" class="form-control" value="<?= htmlspecialchars($billingSettings['billing_reminder_days_before'] ?? '3,1'); ?>" disabled>
+                            <input type="text" name="billing_reminder_days_before" class="form-control" value="<?= htmlspecialchars($billingSettings['billing_reminder_days_before'] ?? '3,1'); ?>">
                             <small>Format: angka dipisah koma, contoh 3,1 untuk H-3 dan H-1.</small>
                         </div>
                         <div class="form-group">
                             <label>Grace Period Isolasi (hari)</label>
-                            <input type="number" class="form-control" value="<?= htmlspecialchars($billingSettings['billing_isolation_delay'] ?? '1'); ?>" disabled>
+                            <input type="number" name="billing_isolation_delay" class="form-control" value="<?= htmlspecialchars($billingSettings['billing_isolation_delay'] ?? '1'); ?>" min="0" max="30">
+                            <small>Jumlah hari setelah jatuh tempo sebelum pelanggan diisolasi.</small>
                         </div>
-                        <button class="btn btn-primary" type="button" disabled><i class="fa fa-save"></i> Simpan</button>
+                        <button class="btn btn-primary" type="submit"><i class="fa fa-save"></i> Simpan Pengaturan</button>
                     </form>
                 </div>
 
