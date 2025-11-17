@@ -385,14 +385,28 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                             <div class="table-responsive">
                                 <table class="invoice-table">
                                     <thead>
-                                        <tr>
-                                            <th style="width: 110px;">Aksi</th>
-                                            <th>ID</th>
-                                            <th>Periode</th>
-                                            <th>Nominal</th>
-                                            <th>Jatuh Tempo</th>
-                                            <th>Status</th>
-                                        </tr>
+                                        <?php if (!empty($quickSearchInvoices)): ?>
+                                            <tr>
+                                                <th>
+                                                    <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)">
+                                                </th>
+                                                <th style="width: 110px;">Aksi</th>
+                                                <th>ID</th>
+                                                <th>Periode</th>
+                                                <th>Nominal</th>
+                                                <th>Jatuh Tempo</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        <?php else: ?>
+                                            <tr>
+                                                <th style="width: 110px;">Aksi</th>
+                                                <th>ID</th>
+                                                <th>Periode</th>
+                                                <th>Nominal</th>
+                                                <th>Jatuh Tempo</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        <?php endif; ?>
                                     </thead>
                                     <tbody>
                                         <?php if (empty($quickSearchInvoices)): ?>
@@ -403,6 +417,7 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                                             <?php foreach ($quickSearchInvoices as $invoice): ?>
                                                 <tr>
                                                     <td class="action-cell">
+                                                        <input type="checkbox" class="invoice-checkbox" value="<?= (int)$invoice['id']; ?>" onchange="toggleInvoiceSelection(<?= (int)$invoice['id']; ?>, this)">
                                                         <div class="invoice-actions">
                                                             <button type="button" class="btn btn-sm btn-success" onclick="openQuickMarkPaidModal(<?= (int)$invoice['id']; ?>)">
                                                                 <i class="fa fa-check"></i>
@@ -426,6 +441,14 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                                     </tbody>
                                 </table>
                             </div>
+                            
+                            <?php if (!empty($quickSearchInvoices)): ?>
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-success" onclick="openBatchMarkPaidModal()">
+                                        <i class="fa fa-check-circle"></i> Tandai Terpilih Lunas
+                                    </button>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -680,6 +703,9 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
 <script>
 const sessionParam = '<?= urlencode($session); ?>';
 
+// Store selected invoice IDs
+let selectedInvoices = [];
+
 function openModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
@@ -690,6 +716,59 @@ function closeModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
     modal.classList.remove('show');
+}
+
+// Toggle invoice selection
+function toggleInvoiceSelection(invoiceId, checkbox) {
+    if (checkbox.checked) {
+        if (!selectedInvoices.includes(invoiceId)) {
+            selectedInvoices.push(invoiceId);
+        }
+    } else {
+        selectedInvoices = selectedInvoices.filter(id => id !== invoiceId);
+    }
+    updateSelectAllCheckbox();
+}
+
+// Select all invoices
+function toggleSelectAll(source) {
+    const checkboxes = document.querySelectorAll('.invoice-checkbox');
+    checkboxes.forEach(checkbox => {
+        if (checkbox !== source) {
+            checkbox.checked = source.checked;
+            toggleInvoiceSelection(parseInt(checkbox.value), checkbox);
+        }
+    });
+}
+
+// Update select all checkbox state
+function updateSelectAllCheckbox() {
+    const checkboxes = document.querySelectorAll('.invoice-checkbox');
+    const selectAllCheckbox = document.getElementById('select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = checkboxes.length > 0 && 
+            Array.from(checkboxes).every(cb => cb.checked);
+    }
+}
+
+// Open batch mark paid modal
+function openBatchMarkPaidModal() {
+    if (selectedInvoices.length === 0) {
+        alert('Silakan pilih invoice terlebih dahulu.');
+        return;
+    }
+    
+    // Clear previous form data
+    document.getElementById('batch_mark_paid_channel_modal').value = '';
+    document.getElementById('batch_mark_paid_reference_modal').value = '';
+    document.getElementById('batch_mark_paid_at_modal').value = new Date().toISOString().slice(0, 16);
+    document.getElementById('batch_mark_paid_notes_modal').value = '';
+    
+    // Show selected invoices count
+    document.getElementById('batchMarkPaidInvoiceMeta').innerHTML = 
+        `<strong>${selectedInvoices.length} invoice</strong> dipilih untuk ditandai lunas.`;
+    
+    openModal('invoiceBatchMarkPaidModal');
 }
 
 document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -909,8 +988,73 @@ document.getElementById('markPaidInvoiceForm').addEventListener('submit', functi
         });
 });
 
+// Handle batch mark paid form submission
+document.getElementById('batchMarkPaidInvoiceForm').addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (selectedInvoices.length === 0) {
+        alert('Tidak ada invoice yang dipilih.');
+        return;
+    }
+
+    const form = event.target;
+    const payload = {
+        action: 'batch_mark_paid',
+        invoice_ids: selectedInvoices,
+        payment_channel: form.payment_channel.value,
+        reference_number: form.reference_number.value,
+        paid_at: form.paid_at.value,
+        notes: form.notes.value
+    };
+
+    fetch('./billing/invoices.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(`${data.processed || selectedInvoices.length} invoice berhasil ditandai lunas.`);
+                window.location.reload();
+            } else {
+                alert(data.message || 'Gagal menandai invoice');
+            }
+        });
+});
+
 function openQuickMarkPaidModalFromList(invoiceId) {
     openQuickMarkPaidModal(invoiceId);
 }
 </script>
+
+<!-- Batch Mark Paid Modal -->
+<div id="invoiceBatchMarkPaidModal" class="modal-overlay">
+    <div class="modal-card">
+        <h4><i class="fa fa-check-circle"></i> Tandai Invoice Terpilih Lunas</h4>
+        <div class="modal-meta" id="batchMarkPaidInvoiceMeta"></div>
+        <form id="batchMarkPaidInvoiceForm">
+            <div class="form-group">
+                <label for="batch_mark_paid_channel_modal">Channel Pembayaran</label>
+                <input type="text" id="batch_mark_paid_channel_modal" name="payment_channel" class="form-control" placeholder="Transfer/Tripay">
+            </div>
+            <div class="form-group">
+                <label for="batch_mark_paid_reference_modal">Nomor Referensi</label>
+                <input type="text" id="batch_mark_paid_reference_modal" name="reference_number" class="form-control" placeholder="Opsional">
+            </div>
+            <div class="form-group">
+                <label for="batch_mark_paid_at_modal">Tanggal Dibayar</label>
+                <input type="datetime-local" id="batch_mark_paid_at_modal" name="paid_at" class="form-control" value="<?= date('Y-m-d\TH:i'); ?>">
+            </div>
+            <div class="form-group">
+                <label for="batch_mark_paid_notes_modal">Catatan</label>
+                <textarea id="batch_mark_paid_notes_modal" name="notes" rows="2" class="form-control" placeholder="Opsional"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('invoiceBatchMarkPaidModal')">Batal</button>
+                <button type="submit" class="btn btn-success"><i class="fa fa-check"></i> Tandai Lunas</button>
+            </div>
+        </form>
+    </div>
+</div>
 </div>

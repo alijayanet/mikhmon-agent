@@ -14,7 +14,35 @@ try {
 
 $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
 
-$customersStmt = $db->query("SELECT bc.*, bp.profile_name FROM billing_customers bc LEFT JOIN billing_profiles bp ON bc.profile_id = bp.id ORDER BY bc.created_at DESC");
+// Handle search parameters
+$searchType = $_GET['search_type'] ?? '';
+$searchValue = trim($_GET['search_value'] ?? '');
+
+// Build query based on search parameters
+if (!empty($searchValue) && in_array($searchType, ['name', 'phone', 'service_number', 'pppoe'])) {
+    $sql = "SELECT bc.*, bp.profile_name FROM billing_customers bc LEFT JOIN billing_profiles bp ON bc.profile_id = bp.id WHERE ";
+    
+    switch ($searchType) {
+        case 'name':
+            $sql .= "bc.name LIKE :searchValue";
+            break;
+        case 'phone':
+            $sql .= "bc.phone LIKE :searchValue";
+            break;
+        case 'service_number':
+            $sql .= "bc.service_number LIKE :searchValue";
+            break;
+        case 'pppoe':
+            $sql .= "bc.genieacs_pppoe_username LIKE :searchValue";
+            break;
+    }
+    
+    $sql .= " ORDER BY bc.created_at DESC";
+    $customersStmt = $db->prepare($sql);
+    $customersStmt->execute([':searchValue' => "%{$searchValue}%"]);
+} else {
+    $customersStmt = $db->query("SELECT bc.*, bp.profile_name FROM billing_customers bc LEFT JOIN billing_profiles bp ON bc.profile_id = bp.id ORDER BY bc.created_at DESC");
+}
 $customers = $customersStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $profilesStmt = $db->query("SELECT id, profile_name FROM billing_profiles ORDER BY profile_name ASC");
@@ -295,6 +323,54 @@ $isolatedCustomers = count(array_filter($customers, static fn ($row) => (int)($r
 
                 <div class="alert bg-light" style="margin-bottom: 20px;">
                     <strong>Catatan:</strong> Pengaturan tanggal penagihan menentukan kapan invoice otomatis dibuat dan kapan profil akan diubah ke <strong>ISOLIR</strong> jika belum bayar.
+                </div>
+
+                <!-- Search Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0"><i class="fa fa-search"></i> Cari Pelanggan</h4>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($searchValue)): ?>
+                            <div class="alert alert-info">
+                                <strong>Hasil Pencarian:</strong> Menampilkan pelanggan dengan <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $searchType))); ?> mengandung "<?= htmlspecialchars($searchValue); ?>" 
+                                <a href="./?hotspot=billing-customers&session=<?= urlencode($session); ?>" class="float-right">Tampilkan Semua</a>
+                            </div>
+                        <?php endif; ?>
+                        <form method="GET" action="" class="row">
+                            <input type="hidden" name="hotspot" value="billing-customers">
+                            <input type="hidden" name="session" value="<?= htmlspecialchars($session); ?>">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="search_type">Cari Berdasarkan</label>
+                                    <select name="search_type" id="search_type" class="form-control">
+                                        <option value="name" <?= ($_GET['search_type'] ?? '') === 'name' ? 'selected' : ''; ?>>Nama Pelanggan</option>
+                                        <option value="phone" <?= ($_GET['search_type'] ?? '') === 'phone' ? 'selected' : ''; ?>>Nomor Telepon</option>
+                                        <option value="service_number" <?= ($_GET['search_type'] ?? '') === 'service_number' ? 'selected' : ''; ?>>Nomor Layanan</option>
+                                        <option value="pppoe" <?= ($_GET['search_type'] ?? '') === 'pppoe' ? 'selected' : ''; ?>>PPPoE Username</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="form-group">
+                                    <label for="search_value">Kata Kunci</label>
+                                    <input type="text" id="search_value" name="search_value" class="form-control" placeholder="Masukkan kata kunci pencarian" value="<?= htmlspecialchars($_GET['search_value'] ?? ''); ?>">
+                                </div>
+                            </div>
+                            <div class="col-md-3 align-self-end">
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary btn-block">
+                                        <i class="fa fa-search"></i> Cari
+                                    </button>
+                                    <?php if (!empty($_GET['search_value'])): ?>
+                                        <a href="./?hotspot=billing-customers&session=<?= urlencode($session); ?>" class="btn btn-secondary btn-block mt-2">
+                                            <i class="fa fa-times"></i> Reset
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                 </div>
 
                 <div class="table-responsive">
