@@ -54,7 +54,8 @@ $colIndex = [
     'pppoe' => array_search('pppoe username', $header),
     'service_number' => array_search('nomor layanan', $header),
     'profile' => array_search('paket', $header),
-    'billing_day' => array_search('tanggal tagihan', $header),
+    'billing_day' => array_search('tanggal isolasi', $header),
+    'auto_isolation' => array_search('isolasi otomatis', $header),
     'status' => array_search('status', $header),
     'notes' => array_search('catatan', $header),
     'isolated' => array_search('isolasi', $header),
@@ -97,7 +98,7 @@ foreach (array_slice($rows, 1) as $row) {
         continue;
     }
 
-    $billingDay = (int)($row[$colIndex['billing_day']] ?? 1);
+    $billingDay = (int)($row[$colIndex['billing_day']] ?? 20);
     $billingDay = max(1, min(28, $billingDay));
 
     $status = strtolower(trim((string)($row[$colIndex['status']] ?? 'active')));
@@ -122,6 +123,7 @@ foreach (array_slice($rows, 1) as $row) {
         'service_number' => $serviceNumber !== '' ? $serviceNumber : null,
         'genieacs_pppoe_username' => $pppoe,
         'billing_day' => $billingDay,
+        'auto_isolation' => (int)($row[$colIndex['auto_isolation']] ?? 1),
         'status' => $status,
         'is_isolated' => $isolated,
         'notes' => $notes !== '' ? $notes : null,

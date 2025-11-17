@@ -103,6 +103,40 @@ try {
             sendJson(['success' => true]);
         }
 
+        if ($action === 'batch_mark_paid') {
+            $invoiceIds = $data['invoice_ids'] ?? [];
+            if (empty($invoiceIds) || !is_array($invoiceIds)) {
+                sendJson(['success' => false, 'message' => 'Invoice IDs tidak valid'], 400);
+            }
+
+            $processed = 0;
+            foreach ($invoiceIds as $invoiceId) {
+                $id = (int)$invoiceId;
+                if ($id <= 0) continue;
+
+                $service->markInvoicePaid($id, [
+                    'payment_channel' => $data['payment_channel'] ?? null,
+                    'reference_number' => $data['reference_number'] ?? null,
+                    'paid_at' => $data['paid_at'] ?? date('Y-m-d H:i:s'),
+                ]);
+
+                // Record payment if amount is provided
+                $invoice = $service->getInvoiceById($id);
+                if ($invoice && !empty($invoice['amount'])) {
+                    $service->recordPayment($id, (float)$invoice['amount'], [
+                        'method' => $data['payment_channel'] ?? null,
+                        'notes' => $data['notes'] ?? null,
+                        'created_by' => null,
+                        'payment_date' => $data['paid_at'] ?? date('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                $processed++;
+            }
+
+            sendJson(['success' => true, 'processed' => $processed]);
+        }
+
         if ($action === 'update') {
             $invoiceId = isset($data['id']) ? (int)$data['id'] : 0;
             if ($invoiceId <= 0) {

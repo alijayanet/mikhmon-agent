@@ -23,7 +23,8 @@ $headers = [
     'PPPoE Username',
     'Nomor Layanan',
     'Paket',
-    'Tanggal Tagihan',
+    'Tanggal Isolasi',
+    'Isolasi Otomatis',
     'Status',
     'Catatan',
     'Isolasi'
@@ -31,7 +32,7 @@ $headers = [
 
 if (isset($_GET['template'])) {
     $rows = [$headers];
-    $rows[] = ['Contoh Pelanggan', '081234567890', 'email@contoh.com', 'Alamat pelanggan', 'user123@isp', 'CPE-001', 'BRONZE', 1, 'active', 'Catatan opsional', 0];
+    $rows[] = ['Contoh Pelanggan', '081234567890', 'email@contoh.com', 'Alamat pelanggan', 'user123@isp', 'CPE-001', 'BRONZE', 20, 'Ya', 'active', 'Catatan opsional', 0];
 
     $xlsx = SimpleXLSXGen::fromArray($rows);
     $xlsx->downloadAs('template_pelanggan_billing.xlsx');
@@ -50,7 +51,8 @@ foreach ($customers as $customer) {
         $customer['genieacs_pppoe_username'] ?? '',
         $customer['service_number'] ?? '',
         $customer['profile_name'] ?? '',
-        (int)($customer['billing_day'] ?? 1),
+        (int)($customer['billing_day'] ?? 20),
+        ((int)($customer['auto_isolation'] ?? 1) === 1) ? 'Ya' : 'Tidak',
         $customer['status'] ?? 'inactive',
         $customer['notes'] ?? '',
         (int)($customer['is_isolated'] ?? 0)
