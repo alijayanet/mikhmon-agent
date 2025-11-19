@@ -20,7 +20,8 @@ $headers = [
     'PPPoE Username',
     'Nomor Layanan',
     'Paket',
-    'Tanggal Tagihan',
+    'Tanggal Isolasi',
+    'Isolasi Otomatis',
     'Status',
     'Catatan',
     'Isolasi'
@@ -38,7 +39,8 @@ foreach ($customers as $customer) {
         $customer['genieacs_pppoe_username'] ?? '',
         $customer['service_number'] ?? '',
         $customer['profile_name'] ?? '',
-        (int)($customer['billing_day'] ?? 1),
+        (int)($customer['billing_day'] ?? 20),
+        ((int)($customer['auto_isolation'] ?? 1) === 1) ? 'Ya' : 'Tidak',
         $customer['status'] ?? 'inactive',
         $customer['notes'] ?? '',
         (int)($customer['is_isolated'] ?? 0)
@@ -52,5 +54,4 @@ $xlsx = SimpleXLSXGen::fromArray($rows);
 $data = $xlsx->buildXLSX();
 file_put_contents($filename, $data);
 
-echo "File ekspor berhasil dibuat: " . $filename . "\n";
-echo "Jumlah baris data: " . count($rows) . "\n";
+echo "File '$filename' berhasil dibuat.\n";

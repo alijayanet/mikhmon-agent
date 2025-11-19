@@ -124,13 +124,22 @@ graph TB
    git clone https://github.com/alijayanet/mikhmon-agent.git
    ```
 
-2. **Gunakan Db "agent_system"**
+2. **Buat Database**
    ```sql
-   export ke database phpmyadmin
+   CREATE DATABASE mikhmon_agents CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-4. **Run Installer**
-   Akses `http://your-domain/fix_all_modules.php?key=fix-all-2024
 
+3. **Konfigurasi Database**
+   Edit file `include/db_config.php`:
+   ```php
+   define('DB_HOST', 'localhost');
+   define('DB_USER', 'your_db_user');
+   define('DB_PASS', 'your_db_password');
+   define('DB_NAME', 'mikhmon_agents');
+   ```
+
+4. **Run Installer**
+   Akses `http://your-domain/install_database_bulletproof.php` dan ikuti petunjuknya.
 
 ### Konfigurasi Tambahan
 
@@ -195,7 +204,6 @@ Project Link: [https://github.com/alijayanet/mikhmon-agent](https://github.com/a
   Made with ❤️ by Ali Jaya Net
 
 </p>
-
 
 
 
