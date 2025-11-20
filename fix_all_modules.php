@@ -28,6 +28,15 @@ try {
 /** @var PDO $pdo */
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+// Ensure database exists and is selected (for fresh install)
+try {
+    $dbName = defined('DB_NAME') ? DB_NAME : 'mikhmon_agents';
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("USE `{$dbName}`");
+} catch (PDOException $e) {
+    exit("Gagal membuat/memilih database: " . $e->getMessage() . "\n");
+}
+
 function logMessage(string $message, string $status = 'info'): void
 {
     $prefix = [
@@ -685,6 +694,151 @@ foreach ($billingDefaults as $key => $value) {
     upsertSetting($pdo, 'billing_settings', $key, $value);
 }
 logMessage('Billing settings dasar diperbarui', 'ok');
+
+/**
+ * 4.5. Views, Procedures & Triggers (Advanced)
+ */
+logMessage('--- Memastikan Views, Procedures & Triggers ---');
+
+// Views
+$pdo->exec("CREATE OR REPLACE VIEW agent_summary AS
+SELECT 
+    a.id,
+    a.agent_code,
+    a.agent_name,
+    a.phone,
+    a.balance,
+    a.status,
+    a.level,
+    COUNT(DISTINCT av.id) as total_vouchers,
+    COUNT(DISTINCT CASE WHEN av.status = 'used' THEN av.id END) as used_vouchers,
+    SUM(CASE WHEN at.transaction_type = 'topup' THEN at.amount ELSE 0 END) as total_topup,
+    SUM(CASE WHEN at.transaction_type = 'generate' THEN at.amount ELSE 0 END) as total_spent,
+    COALESCE(SUM(ac.commission_amount), 0) as total_commission,
+    a.created_at,
+    a.last_login
+FROM agents a
+LEFT JOIN agent_vouchers av ON a.id = av.agent_id
+LEFT JOIN agent_transactions at ON a.id = at.agent_id
+LEFT JOIN agent_commissions ac ON a.id = ac.agent_id AND ac.status = 'paid'
+GROUP BY a.id");
+
+$pdo->exec("CREATE OR REPLACE VIEW daily_agent_sales AS
+SELECT 
+    DATE(av.created_at) as sale_date,
+    a.agent_code,
+    a.agent_name,
+    av.profile_name,
+    COUNT(*) as voucher_count,
+    SUM(av.buy_price) as total_buy_price,
+    SUM(av.sell_price) as total_sell_price,
+    SUM(av.sell_price - av.buy_price) as total_profit
+FROM agent_vouchers av
+JOIN agents a ON av.agent_id = a.id
+WHERE av.status != 'deleted'
+GROUP BY DATE(av.created_at), a.id, av.profile_name");
+
+logMessage('Views reporting diperbarui', 'ok');
+
+// Procedures
+$pdo->exec("DROP PROCEDURE IF EXISTS topup_agent_balance");
+$pdo->exec("CREATE PROCEDURE topup_agent_balance(
+    IN p_agent_id INT,
+    IN p_amount DECIMAL(15,2),
+    IN p_description TEXT,
+    IN p_created_by VARCHAR(50)
+)
+BEGIN
+    DECLARE v_balance_before DECIMAL(15,2);
+    DECLARE v_balance_after DECIMAL(15,2);
+    
+    SELECT balance INTO v_balance_before FROM agents WHERE id = p_agent_id;
+    SET v_balance_after = v_balance_before + p_amount;
+    
+    UPDATE agents SET balance = v_balance_after WHERE id = p_agent_id;
+    
+    INSERT INTO agent_transactions (
+        agent_id, transaction_type, amount, 
+        balance_before, balance_after, 
+        description, created_by
+    ) VALUES (
+        p_agent_id, 'topup', p_amount,
+        v_balance_before, v_balance_after,
+        p_description, p_created_by
+    );
+END");
+
+$pdo->exec("DROP PROCEDURE IF EXISTS deduct_agent_balance");
+$pdo->exec("CREATE PROCEDURE deduct_agent_balance(
+    IN p_agent_id INT,
+    IN p_amount DECIMAL(15,2),
+    IN p_profile_name VARCHAR(100),
+    IN p_username VARCHAR(100),
+    IN p_description TEXT,
+    OUT p_success BOOLEAN,
+    OUT p_message VARCHAR(255)
+)
+BEGIN
+    DECLARE v_balance_before DECIMAL(15,2);
+    DECLARE v_balance_after DECIMAL(15,2);
+    
+    SELECT balance INTO v_balance_before FROM agents WHERE id = p_agent_id;
+    
+    IF v_balance_before < p_amount THEN
+        SET p_success = FALSE;
+        SET p_message = 'Saldo tidak mencukupi';
+    ELSE
+        SET v_balance_after = v_balance_before - p_amount;
+        UPDATE agents SET balance = v_balance_after WHERE id = p_agent_id;
+        
+        INSERT INTO agent_transactions (
+            agent_id, transaction_type, amount,
+            balance_before, balance_after,
+            profile_name, voucher_username,
+            description
+        ) VALUES (
+            p_agent_id, 'generate', p_amount,
+            v_balance_before, v_balance_after,
+            p_profile_name, p_username,
+            p_description
+        );
+        
+        SET p_success = TRUE;
+        SET p_message = 'Saldo berhasil dipotong';
+    END IF;
+END");
+
+logMessage('Stored Procedures diperbarui', 'ok');
+
+// Triggers
+$pdo->exec("DROP TRIGGER IF EXISTS after_agent_voucher_insert");
+$pdo->exec("CREATE TRIGGER after_agent_voucher_insert
+AFTER INSERT ON agent_vouchers
+FOR EACH ROW
+BEGIN
+    DECLARE v_commission_enabled BOOLEAN;
+    DECLARE v_commission_percent DECIMAL(5,2);
+    
+    SELECT CAST(setting_value AS UNSIGNED) INTO v_commission_enabled
+    FROM agent_settings WHERE setting_key = 'commission_enabled';
+    
+    IF v_commission_enabled THEN
+        SELECT commission_percent INTO v_commission_percent
+        FROM agents WHERE id = NEW.agent_id;
+        
+        IF v_commission_percent > 0 AND NEW.sell_price IS NOT NULL THEN
+            INSERT INTO agent_commissions (
+                agent_id, voucher_id, commission_amount,
+                commission_percent, voucher_price
+            ) VALUES (
+                NEW.agent_id, NEW.id, (NEW.sell_price * v_commission_percent / 100),
+                v_commission_percent, NEW.sell_price
+            );
+        END IF;
+    END IF;
+END");
+
+logMessage('Triggers diperbarui', 'ok');
 
 /**
  * 5. Ringkasan
