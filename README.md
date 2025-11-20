@@ -12,7 +12,7 @@
 ## 📸 Screenshot
 
 ### Dashboard Agent
-![Dashboard Agent](img/agent_dashboard.png)
+![Dashboard Agent](img/dashboard.png)
 *Dashboard agent dengan ringkasan saldo dan statistik*
 
 ### Generate Voucher
@@ -204,6 +204,7 @@ Project Link: [https://github.com/alijayanet/mikhmon-agent](https://github.com/a
   Made with ❤️ by Ali Jaya Net
 
 </p>
+
 
 
 
