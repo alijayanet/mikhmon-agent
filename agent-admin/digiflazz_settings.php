@@ -142,34 +142,7 @@ $statusLabel = $enabled ? 'AKTIF' : 'NON-AKTIF';
 
 ?>
 
-<style>
-.summary-box {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
-    margin-bottom: 25px;
-}
-.summary-card {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 10px;
-    border: 1px solid #e1e1e1;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-.summary-card h4 {
-    margin: 0 0 10px 0;
-    font-size: 16px;
-    font-weight: 600;
-}
-.summary-value {
-    font-size: 24px;
-    font-weight: 700;
-    color: #3c8dbc;
-}
-.card + .card {
-    margin-top: 20px;
-}
-</style>
+
 
 <div class="row">
 <div class="col-12">
@@ -196,9 +169,9 @@ $statusLabel = $enabled ? 'AKTIF' : 'NON-AKTIF';
                     <h1 style="font-size:24px;"><?= $statusLabel; ?></h1>
                     <div><i class="fa fa-plug"></i> Status Integrasi</div>
                     <div style="font-size:12px;margin-top:5px;">Username: <strong><?= htmlspecialchars($settings['digiflazz_username']); ?></strong></div>
-                    <div style="font-size:12px;">Testing: <?= $allowTest ? 'Diizinkan' : 'Non-Aktif'; ?></div>
                 </div>
             </div>
+
             <div class="col-3 col-box-6">
                 <div class="box bg-blue bmh-75">
                     <h1><?= number_format($productStats['total']); ?>
@@ -208,15 +181,15 @@ $statusLabel = $enabled ? 'AKTIF' : 'NON-AKTIF';
                     <div style="font-size:12px;margin-top:5px;">Aktif: <?= number_format($productStats['active']); ?> | Non-aktif: <?= number_format($productStats['inactive']); ?></div>
                 </div>
             </div>
+
             <div class="col-3 col-box-6">
                 <div class="box bg-yellow bmh-75">
                     <h1>Rp <?= number_format((int)$settings['digiflazz_default_markup_nominal'], 0, ',', '.'); ?>
-                        <span style="font-size:15px;">markup</span>
                     </h1>
                     <div><i class="fa fa-tag"></i> Markup Default</div>
-                    <div style="font-size:12px;margin-top:5px;">Ditambahkan ke harga dasar produk.</div>
                 </div>
             </div>
+
             <div class="col-3 col-box-6">
                 <div class="box bg-aqua bmh-75">
                     <h1 style="font-size:18px;"><?= $lastSync; ?></h1>
