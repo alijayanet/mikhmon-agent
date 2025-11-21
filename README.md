@@ -5,7 +5,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/alijayanet/mikhmon-agent)](https://github.com/alijayanet/mikhmon-agent/stargazers)
 
 **Sistem Penjualan Voucher WiFi Otomatis untuk MikroTik Hotspot dengan Fitur Agent/Reseller, Payment Gateway, dan WhatsApp Integration**
-
+Support ROS-v7 dan ROS-v6
 ---
 
 
@@ -142,6 +142,7 @@ graph TB
    Akses `http://your-domain/fix_all_modules.php?key=fix-all-2024.
 
 ### Konfigurasi Tambahan
+untuk ROS-v7 rename folder hotspot menjadi hotspot-v6 dan rename folder hotspot7 menjadi hotspot
 
 #### WhatsApp Integration
 1. Setup webhook di gateway WhatsApp (Fonnte/Wablas/WooWA)
@@ -204,6 +205,7 @@ Project Link: [https://github.com/alijayanet/mikhmon-agent](https://github.com/a
   Made with ❤️ by Ali Jaya Net
 
 </p>
+
 
 
 
