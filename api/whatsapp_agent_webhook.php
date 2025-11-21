@@ -1273,7 +1273,7 @@ function processDigiflazzPurchaseCommand($phone, $agentData, $sku, $customerNumb
             $content .= "Nama   : {$customerName}\n";
         }
         $content .= "Status : *" . strtoupper($digiflazzResponse['status'] ?? 'PENDING') . "*\n";
-        $content .= "Ref ID : {$digiflazzResponse['ref_id'] ?? $refId}\n";
+        $content .= "Ref ID : " . ($digiflazzResponse['ref_id'] ?? $refId) . "\n";
         $content .= "Biaya  : " . formatRupiah($sellPrice) . "\n";
         if (!empty($digiflazzResponse['sn'])) {
             $content .= "SN     : `{$digiflazzResponse['sn']}`\n";
@@ -1451,7 +1451,7 @@ function addAgentBalance($adminPhone, $agentIdentifier, $amount) {
         $reply = "✅ *SALDO BERHASIL DITAMBAHKAN*\n\n";
         $reply .= "━━━━━━━━━━━━━━━━━━━━\n\n";
         $reply .= "*Agent:* {$agent['name']}\n";
-        $reply .= "*Kode:* {$agentCode}\n";
+        $reply .= "*Kode:* {$agent['agent_code']}\n";
         $reply .= "*Jumlah Topup:* Rp " . number_format($amount, 0, ',', '.') . "\n";
         $reply .= "*Saldo Sebelum:* Rp " . number_format($agent['balance'], 0, ',', '.') . "\n";
         $reply .= "*Saldo Sekarang:* Rp " . number_format($newBalance, 0, ',', '.') . "\n";
@@ -1556,7 +1556,7 @@ function disableAgent($adminPhone, $agentIdentifier) {
         $reply = "✅ *AGENT DINONAKTIFKAN*\n\n";
         $reply .= "━━━━━━━━━━━━━━━━━━━━\n\n";
         $reply .= "*Nama:* {$agent['name']}\n";
-        $reply .= "*Kode:* {$agentCode}\n";
+        $reply .= "*Kode:* {$agent['agent_code']}\n";
         $reply .= "*Status:* Nonaktif ❌\n";
         $reply .= "\n━━━━━━━━━━━━━━━━━━━━\n";
         $reply .= "Agent tidak dapat lagi generate voucher.";
@@ -1599,7 +1599,7 @@ function enableAgent($adminPhone, $agentIdentifier) {
         $reply = "✅ *AGENT DIAKTIFKAN*\n\n";
         $reply .= "━━━━━━━━━━━━━━━━━━━━\n\n";
         $reply .= "*Nama:* {$agent['name']}\n";
-        $reply .= "*Kode:* {$agentCode}\n";
+        $reply .= "*Kode:* {$agent['agent_code']}\n";
         $reply .= "*Status:* Aktif ✅\n";
         $reply .= "\n━━━━━━━━━━━━━━━━━━━━\n";
         $reply .= "Agent dapat kembali generate voucher.";
@@ -1702,7 +1702,7 @@ function showAgentInfo($adminPhone, $agentIdentifier) {
         $reply = "👤 *INFO AGENT*\n\n";
         $reply .= "━━━━━━━━━━━━━━━━━━━━\n\n";
         $reply .= "*Nama:* {$agent['name']}\n";
-        $reply .= "*Kode:* {$agentCode}\n";
+        $reply .= "*Kode:* {$agent['agent_code']}\n";
         $reply .= "*Nomor WA:* {$agent['phone']}\n";
         $reply .= "*Status:* {$statusIcon}\n";
         $reply .= "*Terdaftar:* " . date('d/m/Y', strtotime($agent['created_at'])) . "\n\n";
@@ -1715,9 +1715,9 @@ function showAgentInfo($adminPhone, $agentIdentifier) {
         $reply .= "• Total Pengeluaran: Rp " . number_format($spentStats['total_spent'] ?? 0, 0, ',', '.') . "\n\n";
         $reply .= "━━━━━━━━━━━━━━━━━━━━\n\n";
         $reply .= "*Perintah Admin:*\n";
-        $reply .= "• ADDSALDO {$agentCode} <JUMLAH>\n";
-        $reply .= "• DISABLE {$agentCode}\n";
-        $reply .= "• ENABLE {$agentCode}";
+        $reply .= "• ADDSALDO {$agent['agent_code']} <JUMLAH>\n";
+        $reply .= "• DISABLE {$agent['agent_code']}\n";
+        $reply .= "• ENABLE {$agent['agent_code']}";
         
         sendWhatsAppMessage($adminPhone, $reply);
         
