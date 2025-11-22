@@ -52,8 +52,8 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// Handle set/update price (both regular POST and AJAX)
-if (isset($_POST['set_price']) || (isset($_POST['action']) && $_POST['action'] == 'create')) {
+// Handle set/update price (regular POST - non-AJAX)
+if (isset($_POST['set_price'])) {
     $agentId = $_POST['agent_id'];
     $profileName = $_POST['profile_name'];
     $buyPrice = floatval($_POST['buy_price']);
@@ -61,25 +61,10 @@ if (isset($_POST['set_price']) || (isset($_POST['action']) && $_POST['action'] =
     
     $result = $agent->setAgentPrice($agentId, $profileName, $buyPrice, $sellPrice);
     
-    // Check if this is an AJAX request
-    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-    
     if ($result['success']) {
-        if ($isAjax) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'message' => 'Harga berhasil diset!']);
-            exit;
-        } else {
-            $success = 'Harga berhasil diset!';
-        }
+        $success = 'Harga berhasil diset!';
     } else {
-        if ($isAjax) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => $result['message']]);
-            exit;
-        } else {
-            $error = $result['message'];
-        }
+        $error = $result['message'];
     }
 }
 
@@ -160,7 +145,7 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
             <h3 style="margin: 0;"><i class="fa fa-plus-circle"></i> Set Harga Baru</h3>
             <button type="button" onclick="hideAddPriceModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
         </div>
-        <form data-api-form data-api-endpoint="./agent-prices.php" data-success-reload="true">
+        <form data-api-form data-api-endpoint="api/agent-prices.php" data-success-reload="true">
             <input type="hidden" name="action" value="create">
             <div class="form-row">
                 <div class="form-group">
@@ -310,5 +295,3 @@ function editPrice(agentId, profileName, buyPrice, sellPrice) {
     btn.classList.add('btn-warning');
 }
 </script>
-</body>
-</html>
