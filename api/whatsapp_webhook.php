@@ -5,7 +5,9 @@
  */
 
 session_start();
-error_reporting(0);
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
 // Load required files
 include('../include/config.php');
@@ -16,6 +18,11 @@ include('../lib/formatbytesbites.php');
 // Load database config if available (for admin check)
 if (file_exists('../include/db_config.php')) {
     include('../include/db_config.php');
+}
+
+// Load WiFi commands module
+if (file_exists(__DIR__ . '/whatsapp_wifi_commands.php')) {
+    include_once(__DIR__ . '/whatsapp_wifi_commands.php');
 }
 
 // IMPORTANT: Save session config before overwriting $data
@@ -229,6 +236,13 @@ function processCommand($phone, $message) {
     $messageTrimmed = trim($message);
     $messageLower = strtolower($messageTrimmed);
     
+    // Try WiFi commands first (GANTI WIFI, GANTI SANDI)
+    if (function_exists('processWiFiCommand')) {
+        if (processWiFiCommand($phone, $messageLower, $messageTrimmed)) {
+            return; // WiFi command was processed
+        }
+    }
+    
     // Command: VOUCHER [USERNAME] <PROFILE> [NOMER] - Username dan Password SAMA
     // Example: VOUCHER 3K, VOUCHER 1JAM, VOUCHER 3K 08123456789
     // Example with manual username: VOUCHER user123 3K, VOUCHER user123 3K 08123456789
@@ -370,6 +384,102 @@ function processCommand($phone, $message) {
             purchaseDigiflazz($phone, $sku, $customerNo);
         } else {
             sendWhatsAppMessage($phone, "❌ *FORMAT SALAH*\n\nFormat: PULSA <SKU> <NOMER>\nContoh: PULSA as10 081234567890\n\nKetik HELP untuk bantuan");
+        }
+        return; // Valid command processed
+    }
+    // Command: GANTIWIFI <DEVICE_ID> <SSID_BARU> - Ubah WiFi SSID (detailed format)
+    // OR: GANTIWIFI <SSID_BARU> - Ubah WiFi SSID (simple format untuk pelanggan terdaftar)
+    // Example: GANTIWIFI 192168001001 ALIJAYA-NET
+    // Example: GANTIWIFI ALIJAYA-GUEST
+    elseif (strpos($messageLower, 'gantiwifi ') === 0) {
+        $rest = trim(str_replace('gantiwifi ', '', $messageLower));
+        $parts = preg_split('/\s+/', $rest, 2);
+        
+        // Determine if this is simple format (1 param) or detailed format (2 params)
+        if (count($parts) == 1) {
+            // Simple format: GANTIWIFI <SSID_BARU>
+            $newSSID = trim($parts[0]);
+            if (!empty($newSSID)) {
+                changeWiFiSSIDByCustomer($phone, $newSSID);
+            }
+        } elseif (count($parts) >= 2) {
+            // Detailed format: GANTIWIFI <DEVICE_ID> <SSID_BARU>
+            $deviceId = trim($parts[0]);
+            $newSSID = trim($parts[1]);
+            changeWiFiSSID($phone, $deviceId, $newSSID);
+        } else {
+            sendWhatsAppMessage($phone, "❌ *FORMAT SALAH*\n\nFormat 1 (Simple): GANTIWIFI <SSID_BARU>\nContoh: GANTIWIFI ALIJAYA-GUEST\n\nFormat 2 (Detail): GANTIWIFI <DEVICE_ID> <SSID_BARU>\nContoh: GANTIWIFI 192168001001 ALIJAYA-NET");
+        }
+        return; // Valid command processed
+    }
+    // Command: GANTISANDI <DEVICE_ID> <PASSWORD_BARU> - Ubah WiFi Password (detailed format)
+    // OR: GANTISANDI <PASSWORD_BARU> - Ubah WiFi Password (simple format untuk pelanggan terdaftar)
+    // Example: GANTISANDI 192168001001 password123456
+    // Example: GANTISANDI password123456
+    elseif (strpos($messageLower, 'gantisandi ') === 0) {
+        $rest = trim(str_replace('gantisandi ', '', $messageLower));
+        $parts = preg_split('/\s+/', $rest, 2);
+        
+        // Determine if this is simple format (1 param) or detailed format (2 params)
+        if (count($parts) == 1) {
+            // Simple format: GANTISANDI <PASSWORD_BARU>
+            $newPassword = trim($parts[0]);
+            if (!empty($newPassword)) {
+                changeWiFiPasswordByCustomer($phone, $newPassword);
+            }
+        } elseif (count($parts) >= 2) {
+            // Detailed format: GANTISANDI <DEVICE_ID> <PASSWORD_BARU>
+            $deviceId = trim($parts[0]);
+            $newPassword = trim($parts[1]);
+            changeWiFiPassword($phone, $deviceId, $newPassword);
+        } else {
+            sendWhatsAppMessage($phone, "❌ *FORMAT SALAH*\n\nFormat 1 (Simple): GANTISANDI <PASSWORD_BARU>\nContoh: GANTISANDI password123456\n\nFormat 2 (Detail): GANTISANDI <DEVICE_ID> <PASSWORD_BARU>\nContoh: GANTISANDI 192168001001 password123456");
+        }
+        return; // Valid command processed
+    }
+    // Command: CARIPERANGKAT <NOMOR|USERNAME> - Cari Device ID dari nomor atau username
+    // Example: CARIPERANGKAT 081234567890, CARIPERANGKAT user123
+    elseif (strpos($messageLower, 'cariperangkat ') === 0) {
+        $rest = trim(str_replace('cariperangkat ', '', $messageLower));
+        
+        if (!empty($rest)) {
+            findDeviceByPhoneOrUsername($phone, $rest);
+        } else {
+            sendWhatsAppMessage($phone, "❌ *FORMAT SALAH*\n\nFormat: CARIPERANGKAT <NOMOR_TELEPON|USERNAME>\nContoh: CARIPERANGKAT 081234567890\nContoh: CARIPERANGKAT user123");
+        }
+        return; // Valid command processed
+    }
+    // Command: GANTIWIFI <SSID_BARU> - Ubah WiFi SSID (simple format untuk pelanggan terdaftar - auto lookup)
+    // Example: GANTIWIFI ALIJAYA-GUEST
+    elseif (strpos($messageLower, 'gantiwifi ') === 0 && strpos($messageLower, 'gantiwifi ') === 0) {
+        $newSSID = trim(str_replace('gantiwifi ', '', $messageLower));
+        
+        // Check if this looks like a device ID format (contains dots or numbers)
+        $isDeviceId = (strpos($newSSID, '.') !== false || (strlen($newSSID) > 10 && preg_match('/\d+/', $newSSID)));
+        
+        if (!$isDeviceId && !empty($newSSID)) {
+            // This is simple format - auto lookup customer
+            changeWiFiSSIDByCustomer($phone, $newSSID);
+        } else {
+            // This will be handled by the detailed GANTIWIFI command below
+            // Continue to next condition
+        }
+        return; // Valid command processed
+    }
+    // Command: GANTISANDI <PASSWORD_BARU> - Ubah WiFi Password (simple format untuk pelanggan terdaftar - auto lookup)
+    // Example: GANTISANDI password123456
+    elseif (strpos($messageLower, 'gantisandi ') === 0) {
+        $newPassword = trim(str_replace('gantisandi ', '', $messageLower));
+        
+        // Check if this looks like a device ID format
+        $isDeviceId = (strpos($newPassword, '.') !== false || (strlen($newPassword) > 32));
+        
+        if (!$isDeviceId && !empty($newPassword)) {
+            // This is simple format - auto lookup customer
+            changeWiFiPasswordByCustomer($phone, $newPassword);
+        } else {
+            // This will be handled by detailed command
+            // Continue to next condition
         }
         return; // Valid command processed
     }
@@ -1149,9 +1259,28 @@ function editPPPoESecret($phone, $username, $newProfile) {
         "profile" => $newProfile
     ));
     
+    // Disconnect active session (jika ada) agar client reconnect dengan profile baru
+    $activeSessions = $API->comm("/ppp/active/print", array("?name" => $username));
+    if (!empty($activeSessions)) {
+        foreach ($activeSessions as $activeSession) {
+            $API->comm("/ppp/active/remove", array(
+                ".id" => $activeSession['.id']
+            ));
+        }
+        $activeSessionCount = count($activeSessions);
+    } else {
+        $activeSessionCount = 0;
+    }
+    
     $API->disconnect();
     
-    sendWhatsAppMessage($phone, "✅ *PROFILE BERHASIL DIUPDATE*\n\nUsername: *$username*\nProfile Baru: *$newProfile*");
+    // Build response message
+    $message = "✅ *PROFILE BERHASIL DIUPDATE*\n\nUsername: *$username*\nProfile Baru: *$newProfile*";
+    if ($activeSessionCount > 0) {
+        $message .= "\n\n✔️ Session aktif ($activeSessionCount) sudah dihapus.\nClient akan reconnect otomatis dengan profile baru.";
+    }
+    
+    sendWhatsAppMessage($phone, $message);
 }
 
 /**
@@ -1892,6 +2021,22 @@ function sendHelp($phone) {
     $message .= "🛒 *BELI <NAMA_PAKET>*\n";
     $message .= "Membeli voucher (menggunakan setting default)\n";
     $message .= "Contoh: BELI 1JAM\n\n";
+    $message .= "🔍 *CARIPERANGKAT <NOMOR|USERNAME>*\n";
+    $message .= "Cari Device ID dari nomor telepon atau username PPPoE\n";
+    $message .= "Contoh: CARIPERANGKAT 081234567890\n";
+    $message .= "Contoh: CARIPERANGKAT user123\n\n";
+    $message .= "📡 *GANTIWIFI <SSID_BARU>*\n";
+    $message .= "Ubah WiFi SSID ONU Anda (untuk pelanggan terdaftar)\n";
+    $message .= "Contoh: GANTIWIFI ALIJAYA-GUEST\n\n";
+    $message .= "📡 *GANTIWIFI <DEVICE_ID> <SSID_BARU>*\n";
+    $message .= "Ubah WiFi SSID dengan detail (jika sudah tahu Device ID)\n";
+    $message .= "Contoh: GANTIWIFI 192168001001 ALIJAYA-NET\n\n";
+    $message .= "🔐 *GANTISANDI <PASSWORD_BARU>*\n";
+    $message .= "Ubah WiFi Password ONU Anda (untuk pelanggan terdaftar)\n";
+    $message .= "Contoh: GANTISANDI password123456\n\n";
+    $message .= "🔐 *GANTISANDI <DEVICE_ID> <PASSWORD_BARU>*\n";
+    $message .= "Ubah WiFi Password dengan detail (jika sudah tahu Device ID)\n";
+    $message .= "Contoh: GANTISANDI 192168001001 password123456\n\n";
     
     // Admin-only commands
     $isAdmin = isAdminNumber($phone);
@@ -2388,6 +2533,554 @@ function checkDigiflazzBalance($phone) {
     }
 }
 
+/**
+ * Find and get PPPoE/Hotspot username from WhatsApp phone number
+ * Returns username if customer found, null otherwise
+ */
+function getCustomerUsernameByPhone($phone) {
+    global $sessionConfig;
+    
+    $data = $sessionConfig;
+    if (empty($data) || !is_array($data)) {
+        return null;
+    }
+    
+    // Get first session
+    $sessions = array_keys($data);
+    $session = null;
+    foreach ($sessions as $s) {
+        if ($s != 'mikhmon') {
+            $session = $s;
+            break;
+        }
+    }
+    
+    if (!$session) {
+        return null;
+    }
+    
+    // Load session config
+    $iphost = explode('!', $data[$session][1])[1];
+    $userhost = explode('@|@', $data[$session][2])[1];
+    $passwdhost = explode('#|#', $data[$session][3])[1];
+    
+    try {
+        // Check database first for phone lookup
+        if (function_exists('getDBConnection')) {
+            try {
+                $db = getDBConnection();
+                if ($db) {
+                    // Normalize phone numbers for comparison
+                    $phoneVariants = [];
+                    $phoneVariants[] = $phone;
+                    
+                    if (strpos($phone, '62') === 0) {
+                        $phoneVariants[] = '0' . substr($phone, 2);
+                    }
+                    if (strpos($phone, '0') === 0) {
+                        $phoneVariants[] = '62' . substr($phone, 1);
+                    }
+                    
+                    // Search in billing_customers
+                    foreach ($phoneVariants as $variant) {
+                        $stmt = $db->prepare("SELECT username FROM billing_customers WHERE phone = :phone OR phone = :phone2 LIMIT 1");
+                        $stmt->execute([':phone' => $variant, ':phone2' => $variant]);
+                        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($customer && !empty($customer['username'])) {
+                            return $customer['username'];
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Continue without database
+            }
+        }
+        
+        // If not in database, return null
+        return null;
+        
+    } catch (Exception $e) {
+        error_log("Error getting customer username: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Change WiFi SSID for registered customer (auto lookup by phone)
+ */
+function changeWiFiSSIDByCustomer($phone, $newSSID) {
+    // Validate SSID
+    if (strlen($newSSID) < 3 || strlen($newSSID) > 32) {
+        sendWhatsAppMessage($phone, "❌ *SSID TIDAK VALID*\n\nSSID harus 3-32 karakter.\nSSID Anda: {$newSSID} (" . strlen($newSSID) . " karakter)");
+        return;
+    }
+    
+    // Check for special characters
+    if (preg_match('/[<>&"\'`]/', $newSSID)) {
+        sendWhatsAppMessage($phone, "❌ *SSID TIDAK VALID*\n\nSSID tidak boleh mengandung karakter spesial: < > & \" ' `");
+        return;
+    }
+    
+    // Get customer username from phone
+    $username = getCustomerUsernameByPhone($phone);
+    
+    if (!$username) {
+        sendWhatsAppMessage($phone, "❌ *AKUN TIDAK TERDAFTAR*\n\nNomor WhatsApp Anda tidak terdaftar sebagai pelanggan.\n\nSilakan hubungi admin atau gunakan perintah:\nCARI PERANGKAT <nomor|username>");
+        return;
+    }
+    
+    // Use username as device ID
+    changeWiFiSSID($phone, $username, $newSSID);
+}
+
+/**
+ * Change WiFi Password for registered customer (auto lookup by phone)
+ */
+function changeWiFiPasswordByCustomer($phone, $newPassword) {
+    // Validate password
+    if (strlen($newPassword) < 8 || strlen($newPassword) > 32) {
+        sendWhatsAppMessage($phone, "❌ *PASSWORD TIDAK VALID*\n\nPassword harus 8-32 karakter.\nPassword Anda: " . str_repeat('*', strlen($newPassword)) . " (" . strlen($newPassword) . " karakter)");
+        return;
+    }
+    
+    // Check for special characters
+    if (preg_match('/[<>&"\'`]/', $newPassword)) {
+        sendWhatsAppMessage($phone, "❌ *PASSWORD TIDAK VALID*\n\nPassword tidak boleh mengandung karakter spesial: < > & \" ' `");
+        return;
+    }
+    
+    // Get customer username from phone
+    $username = getCustomerUsernameByPhone($phone);
+    
+    if (!$username) {
+        sendWhatsAppMessage($phone, "❌ *AKUN TIDAK TERDAFTAR*\n\nNomor WhatsApp Anda tidak terdaftar sebagai pelanggan.\n\nSilakan hubungi admin atau gunakan perintah:\nCARI PERANGKAT <nomor|username>");
+        return;
+    }
+    
+    // Use username as device ID
+    changeWiFiPassword($phone, $username, $newPassword);
+}
+
+/**
+ * Find Device ID by Phone Number or PPPoE Username
+ */
+function findDeviceByPhoneOrUsername($phone, $query) {
+    global $sessionConfig;
+    
+    $data = $sessionConfig;
+    if (empty($data) || !is_array($data)) {
+        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi tidak ter-load.");
+        return;
+    }
+    
+    // Get first session
+    $sessions = array_keys($data);
+    $session = null;
+    foreach ($sessions as $s) {
+        if ($s != 'mikhmon') {
+            $session = $s;
+            break;
+        }
+    }
+    
+    if (!$session) {
+        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
+        return;
+    }
+    
+    // Load session config
+    $iphost = explode('!', $data[$session][1])[1];
+    $userhost = explode('@|@', $data[$session][2])[1];
+    $passwdhost = explode('#|#', $data[$session][3])[1];
+    
+    try {
+        // Connect to MikroTik
+        $API = new RouterosAPI();
+        $API->debug = false;
+        
+        if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
+            sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
+            return;
+        }
+        
+        $results = [];
+        
+        // Search in PPPoE secrets by username
+        $pppoeSecrets = $API->comm("/ppp/secret/print");
+        
+        foreach ($pppoeSecrets as $secret) {
+            $username = trim($secret['name'] ?? '');
+            
+            if (empty($username)) continue;
+            
+            // Check if query matches username
+            if (strtolower($username) === strtolower($query)) {
+                $results[] = [
+                    'type' => 'PPPoE Username',
+                    'value' => $username,
+                    'profile' => $secret['profile'] ?? 'N/A',
+                    'service' => $secret['service'] ?? 'N/A',
+                    'disabled' => ($secret['disabled'] ?? 'false') == 'true' ? 'Yes' : 'No'
+                ];
+            }
+        }
+        
+        // Search in hotspot users
+        $hotspotUsers = $API->comm("/ip/hotspot/user/print");
+        
+        foreach ($hotspotUsers as $huser) {
+            $username = trim($huser['name'] ?? '');
+            
+            if (empty($username)) continue;
+            
+            // Check if query matches hotspot username
+            if (strtolower($username) === strtolower($query)) {
+                $results[] = [
+                    'type' => 'Hotspot User',
+                    'value' => $username,
+                    'profile' => $huser['profile'] ?? 'N/A',
+                    'server' => $huser['server'] ?? 'N/A',
+                    'disabled' => ($huser['disabled'] ?? 'false') == 'true' ? 'Yes' : 'No'
+                ];
+            }
+        }
+        
+        // Search by phone number - check against comments or custom fields
+        // Try to find from database if available
+        if (function_exists('getDBConnection')) {
+            try {
+                $db = getDBConnection();
+                if ($db) {
+                    // Search in billing customers
+                    $stmt = $db->prepare("SELECT * FROM billing_customers WHERE phone LIKE :query OR username LIKE :query LIMIT 10");
+                    $queryParam = '%' . $query . '%';
+                    $stmt->execute([':query' => $queryParam]);
+                    
+                    while ($customer = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $results[] = [
+                            'type' => 'Billing Customer',
+                            'phone' => $customer['phone'] ?? 'N/A',
+                            'username' => $customer['username'] ?? 'N/A',
+                            'status' => $customer['status'] ?? 'N/A',
+                            'service_type' => $customer['service_type'] ?? 'N/A'
+                        ];
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("Error searching database: " . $e->getMessage());
+            }
+        }
+        
+        $API->disconnect();
+        
+        // Display results
+        if (empty($results)) {
+            sendWhatsAppMessage($phone, "❌ *TIDAK DITEMUKAN*\n\nTidak ada hasil untuk: `{$query}`\n\nSilakan periksa kembali nomor atau username Anda.");
+            return;
+        }
+        
+        $resultMsg = "🔍 *HASIL PENCARIAN: {$query}*\n\n";
+        $resultMsg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        
+        $count = 0;
+        foreach ($results as $result) {
+            $count++;
+            if ($count > 10) {
+                $resultMsg .= "\n... dan " . (count($results) - 10) . " hasil lainnya";
+                break;
+            }
+            
+            $resultMsg .= "📋 *Hasil #" . $count . "*\n";
+            $resultMsg .= "Tipe: " . ($result['type'] ?? 'N/A') . "\n";
+            
+            if ($result['type'] === 'PPPoE Username') {
+                $resultMsg .= "Username: `{$result['value']}`\n";
+                $resultMsg .= "Profile: {$result['profile']}\n";
+                $resultMsg .= "Status: " . ($result['disabled'] === 'Yes' ? '❌ Disabled' : '✅ Active') . "\n";
+            } elseif ($result['type'] === 'Hotspot User') {
+                $resultMsg .= "Username: `{$result['value']}`\n";
+                $resultMsg .= "Profile: {$result['profile']}\n";
+                $resultMsg .= "Status: " . ($result['disabled'] === 'Yes' ? '❌ Disabled' : '✅ Active') . "\n";
+            } elseif ($result['type'] === 'Billing Customer') {
+                $resultMsg .= "Username: `{$result['username']}`\n";
+                $resultMsg .= "Phone: {$result['phone']}\n";
+                $resultMsg .= "Status: {$result['status']}\n";
+                $resultMsg .= "Service: {$result['service_type']}\n";
+            }
+            
+            $resultMsg .= "\n";
+        }
+        
+        $resultMsg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        $resultMsg .= "💡 *Catatan:*\n";
+        $resultMsg .= "Untuk mengubah WiFi, gunakan username sebagai DEVICE_ID:\n";
+        $resultMsg .= "GANTIWIFI <username> SSID_BARU\n";
+        $resultMsg .= "GANTISANDI <username> PASSWORD_BARU\n\n";
+        $resultMsg .= "Atau hubungi admin untuk mendapatkan Device ID GenieACS.";
+        
+        sendWhatsAppMessage($phone, $resultMsg);
+        
+        // Log transaction
+        logWhatsAppTransaction($phone, $query, 'FOUND', json_encode(['results_count' => count($results)]));
+        
+    } catch (Exception $e) {
+        error_log("Find device error: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ *ERROR PENCARIAN*\n\n" . $e->getMessage());
+    }
+}
+
+/**
+ * Change WiFi SSID via GenieACS API (atau gunakan username jika ada mapping)
+ */
+function changeWiFiSSID($phone, $deviceId, $newSSID) {
+    // Validate SSID
+    if (strlen($newSSID) < 3 || strlen($newSSID) > 32) {
+        sendWhatsAppMessage($phone, "❌ *SSID TIDAK VALID*\n\nSSID harus 3-32 karakter.\nSSID Anda: {$newSSID} (" . strlen($newSSID) . " karakter)");
+        return;
+    }
+    
+    // Remove special characters that might break the request
+    if (preg_match('/[<>&"\'`]/', $newSSID)) {
+        sendWhatsAppMessage($phone, "❌ *SSID TIDAK VALID*\n\nSSID tidak boleh mengandung karakter spesial: < > & \" ' `");
+        return;
+    }
+    
+    try {
+        // Try using GenieACS API functions (same as web interface)
+        if (function_exists('genieacs_create_task')) {
+            // Use existing GenieACS function that's already tested
+            $task = [
+                "name" => "setParameterValues",
+                "parameterValues" => [
+                    ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $newSSID, 'xsd:string']
+                ]
+            ];
+            
+            $result = genieacs_create_task($deviceId, $task, true); // true = connection_request to trigger device connect
+            
+            if (isset($result['error'])) {
+                error_log("WiFi SSID change error (API function): " . $result['error']);
+                sendWhatsAppMessage($phone, "❌ *GAGAL UBAH SSID*\n\nError: " . $result['error']);
+                return;
+            }
+            
+            // Success
+            $successMsg = "✅ *SSID BERHASIL DIUBAH*\n\n";
+            $successMsg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+            $successMsg .= "📱 Device ID: {$deviceId}\n";
+            $successMsg .= "📡 SSID Baru: *{$newSSID}*\n\n";
+            $successMsg .= "⏳ Perubahan akan diproses dalam beberapa detik.\n";
+            $successMsg .= "Perangkat akan boot ulang otomatis.";
+            
+            sendWhatsAppMessage($phone, $successMsg);
+            
+            // Log transaction
+            logWhatsAppTransaction($phone, $deviceId, 'SUCCESS', json_encode(['action' => 'change_ssid', 'device_id' => $deviceId, 'new_ssid' => $newSSID]));
+            return;
+        }
+    } catch (Exception $e) {
+        error_log("WiFi SSID change (API function) exception: " . $e->getMessage());
+        // Fall through to curl method if function doesn't exist
+    }
+    
+    // Fallback: Use direct CURL method (if genieacs_create_task not available)
+    try {
+        // Call GenieACS API via curl (same pattern as save_wifi.php)
+        // Use the endpoint: /devices/{device_id}/tasks?connection_request
+        $genieacs_base = 'http://192.168.8.89:7557/api';
+        $genieacs_url = $genieacs_base . '/devices/' . urlencode($deviceId) . '/tasks?connection_request';
+        
+        // Create task payload
+        $task_payload = [
+            'name' => 'setParameterValues',
+            'parameterValues' => [
+                ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', $newSSID, 'xsd:string']
+            ]
+        ];
+        
+        // Initialize curl with proper timeout
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $genieacs_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($task_payload));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        
+        // Execute request
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+        
+        // Check for curl errors
+        if (!empty($curl_error)) {
+            error_log("WiFi SSID change curl error: {$curl_error} (Device: {$deviceId})");
+            sendWhatsAppMessage($phone, "⚠️ *PROSES LAMBAT*\n\nGenieACS membutuhkan waktu lebih lama.\n\n🔄 Perintah sedang diproses di server.\nMohon tunggu beberapa saat dan cek status device.\n\nDevice ID: {$deviceId}");
+            return;
+        }
+        
+        // Check response - accept 200, 201, 202
+        if ($http_code !== 200 && $http_code !== 201 && $http_code !== 202) {
+            error_log("WiFi SSID change error: HTTP {$http_code}, Response: {$response} (Device: {$deviceId})");
+            sendWhatsAppMessage($phone, "⚠️ *STATUS TIDAK PASTI*\n\nServer merespons kode: {$http_code}\n\nPerubahan mungkin sedang diproses.\n\nDevice ID: {$deviceId}\nSSID Baru: {$newSSID}\n\n⏳ Tunggu 10-15 detik dan cek status device.");
+            return;
+        }
+        
+        // Success response
+        $successMsg = "✅ *SSID BERHASIL DIUBAH*\n\n";
+        $successMsg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        $successMsg .= "📱 Device ID: {$deviceId}\n";
+        $successMsg .= "📡 SSID Baru: *{$newSSID}*\n\n";
+        $successMsg .= "⏳ Perubahan akan diproses dalam beberapa detik.\n";
+        $successMsg .= "Perangkat akan boot ulang otomatis.";
+        
+        sendWhatsAppMessage($phone, $successMsg);
+        
+        // Log transaction
+        logWhatsAppTransaction($phone, $deviceId, 'SUCCESS', json_encode(['action' => 'change_ssid', 'device_id' => $deviceId, 'new_ssid' => $newSSID]));
+        
+    } catch (Exception $e) {
+        error_log("WiFi SSID change exception: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ *ERROR MENGUBAH SSID*\n\n" . $e->getMessage());
+    }
+}
+
+/**
+ * Change WiFi Password via GenieACS API
+ */
+function changeWiFiPassword($phone, $deviceId, $newPassword) {
+    // Validate password
+    if (strlen($newPassword) < 8 || strlen($newPassword) > 32) {
+        sendWhatsAppMessage($phone, "❌ *PASSWORD TIDAK VALID*\n\nPassword harus 8-32 karakter.\nPassword Anda: " . str_repeat('*', strlen($newPassword)) . " (" . strlen($newPassword) . " karakter)");
+        return;
+    }
+    
+    // Remove special characters that might break the request
+    if (preg_match('/[<>&"\'`]/', $newPassword)) {
+        sendWhatsAppMessage($phone, "❌ *PASSWORD TIDAK VALID*\n\nPassword tidak boleh mengandung karakter spesial: < > & \" ' `");
+        return;
+    }
+    
+    try {
+        // Try using GenieACS API functions (same as web interface)
+        if (function_exists('genieacs_create_task')) {
+            // Use existing GenieACS function that's already tested
+            $task = [
+                "name" => "setParameterValues",
+                "parameterValues" => [
+                    // Huawei, ZTE, FiberHome format
+                    ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $newPassword, 'xsd:string'],
+                    // Alternate format for some manufacturers
+                    ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase', $newPassword, 'xsd:string']
+                ]
+            ];
+            
+            $result = genieacs_create_task($deviceId, $task, true); // true = connection_request to trigger device connect
+            
+            if (isset($result['error'])) {
+                error_log("WiFi password change error (API function): " . $result['error']);
+                sendWhatsAppMessage($phone, "❌ *GAGAL UBAH PASSWORD*\n\nError: " . $result['error']);
+                return;
+            }
+            
+            // Success
+            $successMsg = "✅ *PASSWORD BERHASIL DIUBAH*\n\n";
+            $successMsg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+            $successMsg .= "📱 Device ID: {$deviceId}\n";
+            $successMsg .= "🔐 Password Baru: " . str_repeat('*', strlen($newPassword)) . "\n\n";
+            $successMsg .= "⏳ Perubahan akan diproses dalam beberapa detik.\n";
+            $successMsg .= "Perangkat akan boot ulang otomatis.";
+            
+            sendWhatsAppMessage($phone, $successMsg);
+            
+            // Log transaction
+            logWhatsAppTransaction($phone, $deviceId, 'SUCCESS', json_encode(['action' => 'change_password', 'device_id' => $deviceId]));
+            return;
+        }
+    } catch (Exception $e) {
+        error_log("WiFi password change (API function) exception: " . $e->getMessage());
+        // Fall through to curl method if function doesn't exist
+    }
+    
+    // Fallback: Use direct CURL method (if genieacs_create_task not available)
+    try {
+        // Call GenieACS API via curl
+        $genieacs_base = 'http://192.168.8.89:7557/api';
+        $genieacs_url = $genieacs_base . '/devices/' . urlencode($deviceId) . '/tasks?connection_request';
+        
+        // Create task payload - try multiple password paths for different ONU brands
+        $task_payload = [
+            'name' => 'setParameterValues',
+            'parameterValues' => [
+                // Huawei, ZTE, FiberHome format
+                ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', $newPassword, 'xsd:string'],
+                // Alternate format for some manufacturers
+                ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase', $newPassword, 'xsd:string']
+            ]
+        ];
+        
+        // Initialize curl with longer timeout (30 seconds for GenieACS processing)
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $genieacs_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($task_payload));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);  // Increased from 10 to 30 seconds
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);  // Connection timeout
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        
+        // Execute request
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+        
+        // Check for curl errors
+        if (!empty($curl_error)) {
+            // Try to provide more specific error info
+            if (strpos($curl_error, 'timed out') !== false) {
+                sendWhatsAppMessage($phone, "⚠️ *PROSES LAMBAT*\n\nGenieACS membutuhkan waktu lebih lama.\n\n🔄 Perintah sedang diproses di server.\nMohon tunggu beberapa saat dan cek status device.\n\nDevice ID: {$deviceId}");
+            } else {
+                sendWhatsAppMessage($phone, "❌ *GAGAL UBAH PASSWORD*\n\nKoneksi ke GenieACS failed:\n{$curl_error}");
+            }
+            error_log("WiFi password change curl error: {$curl_error} (Device: {$deviceId})");
+            return;
+        }
+        
+        // Check response - accept 200, 201, 202
+        if ($http_code !== 200 && $http_code !== 201 && $http_code !== 202) {
+            error_log("WiFi password change error: HTTP {$http_code}, Response: {$response} (Device: {$deviceId})");
+            sendWhatsAppMessage($phone, "⚠️ *STATUS TIDAK PASTI*\n\nServer merespons kode: {$http_code}\n\nPerubahan mungkin sedang diproses.\n\nDevice ID: {$deviceId}\n\n⏳ Tunggu 10-15 detik dan cek status device.");
+            return;
+        }
+        
+        // Success response
+        $successMsg = "✅ *PASSWORD BERHASIL DIUBAH*\n\n";
+        $successMsg .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        $successMsg .= "📱 Device ID: {$deviceId}\n";
+        $successMsg .= "🔐 Password Baru: " . str_repeat('*', strlen($newPassword)) . "\n\n";
+        $successMsg .= "⏳ Perubahan akan diproses dalam beberapa detik.\n";
+        $successMsg .= "Perangkat akan boot ulang otomatis.";
+        
+        sendWhatsAppMessage($phone, $successMsg);
+        
+        // Log transaction
+        logWhatsAppTransaction($phone, $deviceId, 'SUCCESS', json_encode(['action' => 'change_password', 'device_id' => $deviceId]));
+        
+    } catch (Exception $e) {
+        error_log("WiFi password change exception: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ *ERROR MENGUBAH PASSWORD*\n\n" . $e->getMessage());
+    }
+}
+
 // Return success response
 http_response_code(200);
 echo json_encode(['status' => 'success', 'message' => 'Webhook processed']);
+
