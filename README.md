@@ -126,7 +126,7 @@ graph TB
 
 2. **Buat Database**
    ```sql
-   CREATE DATABASE mikhmon_agents CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   buat database name dan usernya di hosting
    ```
 
 3. **Konfigurasi Database**
@@ -139,7 +139,7 @@ graph TB
    ```
 
 4. **Run Installer**
-   Akses `http://your-domain/install_database_bulletproof.php` dan ikuti petunjuknya.
+   Akses `http://your-domain/fix_all_modules.php?key=fix-all-2024
 
 ### Konfigurasi Tambahan
 
@@ -204,6 +204,7 @@ Project Link: [https://github.com/alijayanet/mikhmon-agent](https://github.com/a
   Made with ❤️ by Ali Jaya Net
 
 </p>
+
 
 
 
