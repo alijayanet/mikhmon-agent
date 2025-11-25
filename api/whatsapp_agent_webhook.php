@@ -61,6 +61,7 @@ function formatRupiah($value) {
 if (!empty($phone) && !empty($message)) {
     // Debug log
     error_log("WhatsApp Agent Webhook - Phone: $phone, Message: $message");
+    error_log("WHATSAPP_GATEWAY: " . (WHATSAPP_GATEWAY ?? 'undefined'));
     processAgentCommand($phone, trim($message));
 } else {
     error_log("WhatsApp Agent Webhook - Empty phone or message. Phone: $phone, Message: $message");
@@ -71,6 +72,7 @@ if (!empty($phone) && !empty($message)) {
  */
 function processAgentCommand($phone, $message) {
     try {
+        error_log("processAgentCommand called - Phone: $phone, Message: $message");
         $messageLower = strtolower($message);
         
         // Debug log
@@ -97,157 +99,180 @@ function processAgentCommand($phone, $message) {
     if ($agentData || $isAdmin) {
         error_log("Command access granted - checking message: $message");
         
-        // GENERATE command
-        if (preg_match('/^(gen|generate)\s+(\w+)(\s+(\d+))?$/i', $message, $matches)) {
-            $profile = $matches[2];
-            $quantity = isset($matches[4]) ? intval($matches[4]) : 1;
-            
-            if ($isAdmin) {
-                generateVoucherAdmin($phone, $profile, $quantity);
-            } else {
-                generateVoucherAgent($phone, $agentData, $profile, $quantity);
+        // Add comprehensive error handling and logging
+        try {
+            // GENERATE command
+            if (preg_match('/^(gen|generate)\s+(\w+)(\s+(\d+))?$/i', $message, $matches)) {
+                $profile = $matches[2];
+                $quantity = isset($matches[4]) ? intval($matches[4]) : 1;
+                
+                if ($isAdmin) {
+                    generateVoucherAdmin($phone, $profile, $quantity);
+                } else {
+                    generateVoucherAgent($phone, $agentData, $profile, $quantity);
+                }
             }
-        }
-        // SALDO command
-        elseif (preg_match('/^(saldo|balance|cek\s*saldo)$/i', $messageLower)) {
-            if ($isAdmin) {
-                sendAdminInfo($phone);
-            } else {
-                checkBalance($phone, $agentData);
+            // SALDO command
+            elseif (preg_match('/^(saldo|balance|cek\s*saldo)$/i', $messageLower)) {
+                if ($isAdmin) {
+                    sendAdminInfo($phone);
+                } else {
+                    checkBalance($phone, $agentData);
+                }
             }
-        }
-        // TRANSAKSI command
-        elseif (preg_match('/^(transaksi|history|riwayat)(\s+(\d+))?$/i', $message, $matches)) {
-            $limit = isset($matches[3]) ? intval($matches[3]) : 10;
-            checkTransactions($phone, $agentData, $limit);
-        }
-        // HARGA command
-        elseif (preg_match('/^(harga|price|paket)$/i', $messageLower)) {
-            if ($agentData) {
-                showAgentPrices($phone, $agentData);
-            } else {
-                showAllPrices($phone);
+            // TRANSAKSI command
+            elseif (preg_match('/^(transaksi|history|riwayat)(\s+(\d+))?$/i', $message, $matches)) {
+                $limit = isset($matches[3]) ? intval($matches[3]) : 10;
+                checkTransactions($phone, $agentData, $limit);
             }
-        }
-        // Cek Tagihan billing command
-        elseif (preg_match('/^(cek\s+tagihan|tagihan)\s+(.+)$/i', $message, $matches)) {
-            if ($agentData) {
-                $keyword = trim($matches[2]);
-                handleBillingCheckCommand($phone, $agentData, $keyword);
-            } else {
-                sendWhatsAppMessage($phone, formatMessage("❌ Perintah ini hanya untuk agent terdaftar."));
+            // HARGA command
+            elseif (preg_match('/^(harga|price|paket)$/i', $messageLower)) {
+                if ($agentData) {
+                    showAgentPrices($phone, $agentData);
+                } else {
+                    showAllPrices($phone);
+                }
             }
-        }
-        // Bayar tagihan billing command
-        elseif (preg_match('/^bayar\s+(.+)$/i', $message, $matches)) {
-            if ($agentData) {
-                $keyword = trim($matches[1]);
-                handleBillingPaymentCommand($phone, $agentData, $keyword);
-            } else {
-                sendWhatsAppMessage($phone, formatMessage("❌ Perintah ini hanya untuk agent terdaftar."));
+            // Cek Tagihan billing command
+            elseif (preg_match('/^(cek\s+tagihan|tagihan)\s+(.+)$/i', $message, $matches)) {
+                if ($agentData) {
+                    $keyword = trim($matches[2]);
+                    handleBillingCheckCommand($phone, $agentData, $keyword);
+                } else {
+                    sendWhatsAppMessage($phone, formatMessage("❌ Perintah ini hanya untuk agent terdaftar."));
+                }
             }
-        }
-        // TOPUP REQUEST command
-        elseif (preg_match('/^topup\s+(\d+)$/i', $message, $matches)) {
-            if ($agentData) {
-                $amount = intval($matches[1]);
-                requestTopup($phone, $agentData, $amount);
+            // Bayar tagihan billing command
+            elseif (preg_match('/^bayar\s+(.+)$/i', $message, $matches)) {
+                if ($agentData) {
+                    $keyword = trim($matches[1]);
+                    handleBillingPaymentCommand($phone, $agentData, $keyword);
+                } else {
+                    sendWhatsAppMessage($phone, formatMessage("❌ Perintah ini hanya untuk agent terdaftar."));
+                }
             }
-        }
-        // PULSA command (Digiflazz purchase)
-        elseif (preg_match('/^pulsa\s+(\S+)\s+([0-9+\-]+)(?:\s+(.+))?$/i', $message, $matches)) {
-            if ($agentData) {
+            // TOPUP REQUEST command
+            elseif (preg_match('/^topup\s+(\d+)$/i', $message, $matches)) {
+                if ($agentData) {
+                    $amount = intval($matches[1]);
+                    requestTopup($phone, $agentData, $amount);
+                }
+            }
+            // PULSA command (Digiflazz purchase)
+            elseif (preg_match('/^pulsa\s+(\S+)\s+([0-9+\-]+)(?:\s+(.+))?$/i', $message, $matches)) {
+                error_log("PULSA command detected - Phone: $phone, Message: $message");
+                error_log("PULSA matches: " . json_encode($matches));
+                
                 $sku = strtoupper(trim($matches[1]));
                 $customerNumberInput = trim($matches[2]);
                 $customerNameInput = isset($matches[3]) ? trim($matches[3]) : '';
-                processDigiflazzPurchaseCommand($phone, $agentData, $sku, $customerNumberInput, $customerNameInput);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk agent terdaftar.");
+                
+                error_log("PULSA parsed - SKU: $sku, CustomerNo: $customerNumberInput, CustomerName: $customerNameInput");
+                error_log("PULSA user status - IsAdmin: " . ($isAdmin ? 'YES' : 'NO') . ", HasAgentData: " . ($agentData ? 'YES' : 'NO'));
+                
+                if ($isAdmin) {
+                    error_log("Processing PULSA for ADMIN - Phone: $phone");
+                    // Admin can use Digiflazz without balance deduction
+                    processDigiflazzPurchaseAdmin($phone, null, $sku, $customerNumberInput, $customerNameInput);
+                } elseif ($agentData) {
+                    error_log("Processing PULSA for AGENT - Phone: $phone");
+                    // Regular agents use normal Digiflazz with balance deduction
+                    processDigiflazzPurchaseCommand($phone, $agentData, $sku, $customerNumberInput, $customerNameInput);
+                } else {
+                    error_log("PULSA command rejected - User not authorized");
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk agent terdaftar atau admin.");
+                }
             }
-        }
-        // SALES REPORT command
-        elseif (preg_match('/^(laporan|report|sales)(\s+(today|week|month))?$/i', $message, $matches)) {
-            if ($agentData) {
-                $period = isset($matches[3]) ? strtolower($matches[3]) : 'today';
-                sendSalesReport($phone, $agentData, $period);
+            // SALES REPORT command
+            elseif (preg_match('/^(laporan|report|sales)(\s+(today|week|month))?$/i', $message, $matches)) {
+                if ($agentData) {
+                    $period = isset($matches[3]) ? strtolower($matches[3]) : 'today';
+                    sendSalesReport($phone, $agentData, $period);
+                }
             }
-        }
-        // BROADCAST command (admin only)
-        elseif (preg_match('/^broadcast\s+(.+)$/is', $message, $matches)) {
-            if ($agentData) {
-                $broadcastMessage = $matches[1];
-                broadcastMessage($phone, $agentData, $broadcastMessage);
+            // BROADCAST command (admin only)
+            elseif (preg_match('/^broadcast\s+(.+)$/is', $message, $matches)) {
+                if ($agentData) {
+                    $broadcastMessage = $matches[1];
+                    broadcastMessage($phone, $agentData, $broadcastMessage);
+                }
             }
-        }
-        // ADDSALDO command (admin only)
-        elseif (preg_match('/^addsaldo\s+(.+?)\s+(\d+)$/i', $message, $matches)) {
-            if ($isAdmin) {
-                $agentIdentifier = trim($matches[1]);
-                $amount = intval($matches[2]);
-                addAgentBalance($phone, $agentIdentifier, $amount);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+            // ADDSALDO command (admin only)
+            elseif (preg_match('/^addsaldo\s+(.+?)\s+(\d+)$/i', $message, $matches)) {
+                if ($isAdmin) {
+                    $agentIdentifier = trim($matches[1]);
+                    $amount = intval($matches[2]);
+                    addAgentBalance($phone, $agentIdentifier, $amount);
+                } else {
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+                }
             }
-        }
-        // ADDAGENT command (admin only)
-        elseif (preg_match('/^(addagent|register)\s+(.+?)\s+(\d+)$/i', $message, $matches)) {
-            if ($isAdmin) {
-                $agentName = trim($matches[2]);
-                $agentPhone = $matches[3];
-                registerNewAgent($phone, $agentName, $agentPhone);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+            // ADDAGENT command (admin only)
+            elseif (preg_match('/^(addagent|register)\s+(.+?)\s+(\d+)$/i', $message, $matches)) {
+                if ($isAdmin) {
+                    $agentName = trim($matches[2]);
+                    $agentPhone = $matches[3];
+                    registerNewAgent($phone, $agentName, $agentPhone);
+                } else {
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+                }
             }
-        }
-        // DISABLE command (admin only)
-        elseif (preg_match('/^disable\s+(.+)$/i', $message, $matches)) {
-            if ($isAdmin) {
-                $agentIdentifier = trim($matches[1]);
-                disableAgent($phone, $agentIdentifier);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+            // DISABLE command (admin only)
+            elseif (preg_match('/^disable\s+(.+)$/i', $message, $matches)) {
+                if ($isAdmin) {
+                    $agentIdentifier = trim($matches[1]);
+                    disableAgent($phone, $agentIdentifier);
+                } else {
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+                }
             }
-        }
-        // ENABLE command (admin only)
-        elseif (preg_match('/^enable\s+(.+)$/i', $message, $matches)) {
-            if ($isAdmin) {
-                $agentIdentifier = trim($matches[1]);
-                enableAgent($phone, $agentIdentifier);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+            // ENABLE command (admin only)
+            elseif (preg_match('/^enable\s+(.+)$/i', $message, $matches)) {
+                if ($isAdmin) {
+                    $agentIdentifier = trim($matches[1]);
+                    enableAgent($phone, $agentIdentifier);
+                } else {
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+                }
             }
-        }
-        // LISTAGENT command (admin only)
-        elseif (preg_match('/^(listagent|agents|daftaragent)$/i', $messageLower)) {
-            if ($isAdmin) {
-                listAllAgents($phone);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+            // LISTAGENT command (admin only)
+            elseif (preg_match('/^(listagent|agents|daftaragent)$/i', $messageLower)) {
+                if ($isAdmin) {
+                    listAllAgents($phone);
+                } else {
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+                }
             }
-        }
-        // INFOAGENT command (admin only)
-        elseif (preg_match('/^infoagent\s+(.+)$/i', $message, $matches)) {
-            if ($isAdmin) {
-                $agentIdentifier = trim($matches[1]);
-                showAgentInfo($phone, $agentIdentifier);
-            } else {
-                sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+            // INFOAGENT command (admin only)
+            elseif (preg_match('/^infoagent\s+(.+)$/i', $message, $matches)) {
+                if ($isAdmin) {
+                    $agentIdentifier = trim($matches[1]);
+                    showAgentInfo($phone, $agentIdentifier);
+                } else {
+                    sendWhatsAppMessage($phone, "❌ Perintah ini hanya untuk admin.");
+                }
             }
-        }
-        // HELP command
-        elseif (preg_match('/^(help|bantuan|\?)$/i', $messageLower)) {
-            error_log("HELP command detected - IsAdmin: " . ($isAdmin ? 'YES' : 'NO'));
-            if ($isAdmin) {
-                sendAdminHelp($phone);
-            } else {
-                sendAgentHelp($phone);
+            // HELP command
+            elseif (preg_match('/^(help|bantuan|\?)$/i', $messageLower)) {
+                error_log("HELP command detected - IsAdmin: " . ($isAdmin ? 'YES' : 'NO') . " - Phone: $phone - Message: $message");
+                if ($isAdmin) {
+                    error_log("Sending admin help to: $phone");
+                    sendAdminHelp($phone);
+                } else {
+                    error_log("Sending agent help to: $phone");
+                    sendAgentHelp($phone);
+                }
             }
-        }
-        // Unknown command
-        else {
-            $reply = "❌ Perintah tidak dikenali.\n\n";
-            $reply .= "Ketik *HELP* untuk melihat daftar perintah.";
-            sendWhatsAppMessage($phone, $reply);
+            // Unknown command
+            else {
+                error_log("Unknown command received - Phone: $phone, Message: $message");
+                $reply = "❌ Perintah tidak dikenali.\n\n";
+                $reply .= "Ketik *HELP* untuk melihat daftar perintah.";
+                sendWhatsAppMessage($phone, $reply);
+            }
+        } catch (Exception $e) {
+            error_log("Exception in command processing: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+            sendWhatsAppMessage($phone, "❌ Terjadi kesalahan saat memproses perintah. Silakan coba lagi.");
         }
     }
     // Not registered
@@ -347,7 +372,7 @@ function generateVoucherAgent($phone, $agentData, $profileName, $quantity) {
         $voucher = $voucherGen->generateVoucher();
         $username = $voucher['username'];
         $password = $voucher['password'];
-        $comment = 'Agent-' . $agentData['agent_code'] . '-' . date('dmy');
+        $comment = 'vc-Agent-' . $agentData['agent_code'] . '-' . date('dmy');
         
         // Add to MikroTik
         $API->comm("/ip/hotspot/user/add", array(
@@ -462,7 +487,7 @@ function generateVoucherAdmin($phone, $profileName, $quantity) {
         $voucher = $voucherGen->generateVoucher();
         $username = $voucher['username'];
         $password = $voucher['password'];
-        $comment = 'Admin-WA-' . date('dmy');
+        $comment = 'vc-Admin-WA-' . date('dmy');
         
         // Add to MikroTik
         $API->comm("/ip/hotspot/user/add", array(
@@ -968,6 +993,10 @@ function sendAgentHelp($phone) {
     $reply .= "Kirim pesan ke semua customer\n";
     $reply .= "Contoh: BROADCAST Promo hari ini!\n\n";
     
+    $reply .= "📱 *PULSA <SKU> <NOMOR>*\n";
+    $reply .= "Beli pulsa/data via Digiflazz\n";
+    $reply .= "Contoh: PULSA TELKOM_50K 08123456789\n\n";
+    
     $reply .= "❓ *HELP*\n";
     $reply .= "Tampilkan bantuan ini\n\n";
     
@@ -1020,12 +1049,19 @@ function sendAdminHelp($phone) {
     $reply .= "Aktifkan kembali agent\n";
     $reply .= "Contoh: ENABLE Budi\n\n";
     
+    $reply .= "📱 *PULSA <SKU> <NOMOR>*\n";
+    $reply .= "Beli pulsa/data via Digiflazz (tanpa saldo)\n";
+    $reply .= "Contoh: PULSA TELKOM_50K 08123456789\n\n";
+    
     $reply .= "━━━━━━━━━━━━━━━━━━━━\n";
     $reply .= "🔑 *ADMIN ACCESS ACTIVE*";
     
     error_log("Sending admin help message to: $phone");
+    error_log("Message content: " . $reply);
     $result = sendWhatsAppMessage($phone, $reply);
     error_log("Send result: " . json_encode($result));
+    
+    return $result;
 }
 
 /**
@@ -1037,7 +1073,8 @@ function sendAdminInfo($phone) {
     $reply .= "Privilege: Unlimited\n\n";
     $reply .= "━━━━━━━━━━━━━━━━━━━━\n\n";
     $reply .= "Anda dapat generate voucher tanpa batas.\n";
-    $reply .= "Tidak ada pemotongan saldo.\n\n";
+    $reply .= "Tidak ada pemotongan saldo.\n";
+    $reply .= "Beli pulsa/data via Digiflazz tanpa saldo.\n\n";
     $reply .= "Ketik *HELP* untuk perintah.";
     
     sendWhatsAppMessage($phone, $reply);
@@ -1082,191 +1119,382 @@ function requestTopup($phone, $agentData, $amount) {
  * Process Digiflazz purchase command
  */
 function processDigiflazzPurchaseCommand($phone, $agentData, $sku, $customerNumberInput, $customerNameInput = '') {
-    $agent = new Agent();
-
-    if ($agentData['status'] !== 'active') {
-        sendWhatsAppMessage($phone, "❌ Akun agent Anda tidak aktif. Hubungi admin untuk mengaktifkan kembali.");
-        return;
-    }
-
-    $customerNo = preg_replace('/\D+/', '', $customerNumberInput);
-    if (strlen($customerNo) < 5) {
-        sendWhatsAppMessage($phone, "❌ Nomor tujuan tidak valid. Pastikan hanya berisi angka dan minimal 5 digit.");
-        return;
-    }
-
     try {
-        $digiflazzClient = new DigiflazzClient();
-        if (!$digiflazzClient->isEnabled()) {
-            sendWhatsAppMessage($phone, "❌ Integrasi Digiflazz belum dikonfigurasi. Hubungi administrator.");
+        error_log("processDigiflazzPurchaseCommand called - Phone: $phone, SKU: $sku");
+        
+        $agent = new Agent();
+
+        if ($agentData['status'] !== 'active') {
+            error_log("processDigiflazzPurchaseCommand - Agent not active");
+            sendWhatsAppMessage($phone, "❌ Akun agent Anda tidak aktif. Hubungi admin untuk mengaktifkan kembali.");
             return;
         }
-        $digiflazzSettings = $digiflazzClient->getSettings();
-        $defaultMarkupNominal = isset($digiflazzSettings['default_markup_nominal']) ? (int)$digiflazzSettings['default_markup_nominal'] : 0;
-    } catch (Exception $e) {
-        sendWhatsAppMessage($phone, "❌ Gagal menginisialisasi Digiflazz: " . $e->getMessage());
-        return;
-    }
 
-    $pdo = getDBConnection();
-    $stmt = $pdo->prepare('SELECT * FROM digiflazz_products WHERE buyer_sku_code = :sku AND status = "active" LIMIT 1');
-    $stmt->execute([':sku' => $sku]);
-    $product = $stmt->fetch(PDO::FETCH_ASSOC);
+        $customerNo = preg_replace('/\D+/', '', $customerNumberInput);
+        if (strlen($customerNo) < 5) {
+            error_log("processDigiflazzPurchaseCommand - Invalid customer number: $customerNumberInput");
+            sendWhatsAppMessage($phone, "❌ Nomor tujuan tidak valid. Pastikan hanya berisi angka dan minimal 5 digit.");
+            return;
+        }
 
-    if (!$product) {
-        $stmt = $pdo->prepare('SELECT * FROM digiflazz_products WHERE UPPER(product_name) = :name AND status = "active" LIMIT 1');
-        $stmt->execute([':name' => strtoupper($sku)]);
+        try {
+            $digiflazzClient = new DigiflazzClient();
+            if (!$digiflazzClient->isEnabled()) {
+                error_log("processDigiflazzPurchaseCommand - Digiflazz not enabled");
+                sendWhatsAppMessage($phone, "❌ Integrasi Digiflazz belum dikonfigurasi. Hubungi administrator.");
+                return;
+            }
+            $digiflazzSettings = $digiflazzClient->getSettings();
+            $defaultMarkupNominal = isset($digiflazzSettings['default_markup_nominal']) ? (int)$digiflazzSettings['default_markup_nominal'] : 0;
+        } catch (Exception $e) {
+            error_log("processDigiflazzPurchaseCommand - Exception: " . $e->getMessage());
+            sendWhatsAppMessage($phone, "❌ Gagal menginisialisasi Digiflazz: " . $e->getMessage());
+            return;
+        }
+
+        $pdo = getDBConnection();
+        // Cari produk dengan buyer_sku_code (case-insensitive)
+        $stmt = $pdo->prepare('SELECT * FROM digiflazz_products WHERE UPPER(buyer_sku_code) = UPPER(:sku) AND status = "active" LIMIT 1');
+        $stmt->execute([':sku' => $sku]);
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
 
-    if (!$product) {
-        $reply = "❌ Produk dengan SKU *{$sku}* tidak ditemukan atau tidak aktif.\n";
-        $reply .= "Gunakan perintah: *PULSA <SKU> <NO_HP> [Nama]*\n";
-        $reply .= "Cek katalog di menu Digital Products untuk melihat SKU yang tersedia.";
-        sendWhatsAppMessage($phone, $reply);
-        return;
-    }
-
-    $costPrice = (int)$product['price'];
-    if ($costPrice <= 0 && isset($product['buyer_price'])) {
-        $costPrice = (int)$product['buyer_price'];
-    }
-
-    if ($costPrice <= 0) {
-        sendWhatsAppMessage($phone, "❌ Harga produk tidak valid untuk SKU {$sku}. Coba produk lain atau hubungi admin.");
-        return;
-    }
-
-    $sellPrice = (int)($product['seller_price'] ?? 0);
-    if ($sellPrice <= 0) {
-        $sellPrice = $costPrice;
-        if (!empty($defaultMarkupNominal) && $defaultMarkupNominal > 0) {
-            $sellPrice += $defaultMarkupNominal;
+        if (!$product) {
+            // Jika tidak ditemukan berdasarkan SKU, cari berdasarkan nama produk
+            $stmt = $pdo->prepare('SELECT * FROM digiflazz_products WHERE UPPER(product_name) = UPPER(:name) AND status = "active" LIMIT 1');
+            $stmt->execute([':name' => $sku]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
         }
-    }
 
-    if ($sellPrice < $costPrice) {
-        $sellPrice = $costPrice;
-    }
-
-    $agentLatest = $agent->getAgentById($agentData['id']);
-    if (!$agentLatest || $agentLatest['status'] !== 'active') {
-        sendWhatsAppMessage($phone, "❌ Akun agent tidak ditemukan atau tidak aktif.");
-        return;
-    }
-
-    if ($agentLatest['balance'] < $sellPrice) {
-        $reply = "❌ *SALDO TIDAK CUKUP*\n\n";
-        $reply .= "Saldo Anda: " . formatRupiah($agentLatest['balance']) . "\n";
-        $reply .= "Harga Produk: " . formatRupiah($sellPrice) . "\n";
-        $reply .= "Kurang: " . formatRupiah($sellPrice - $agentLatest['balance']) . "\n\n";
-        $reply .= "Silakan topup saldo terlebih dahulu.";
-        sendWhatsAppMessage($phone, $reply);
-        return;
-    }
-
-    $refId = $digiflazzClient->generateRefId('WA' . $agentLatest['agent_code']);
-
-    $orderPayload = [
-        'buyer_sku_code' => $product['buyer_sku_code'],
-        'customer_no' => $customerNo,
-        'ref_id' => $refId,
-    ];
-
-    $customerName = trim($customerNameInput);
-    if ($customerName !== '') {
-        $orderPayload['customer_name'] = $customerName;
-    }
-
-    try {
-        $digiflazzResponse = $digiflazzClient->createTransaction($orderPayload);
-    } catch (Exception $e) {
-        sendWhatsAppMessage($phone, "❌ Transaksi Digiflazz gagal: " . $e->getMessage());
-        return;
-    }
-
-    $deductResult = $agent->deductBalance(
-        $agentLatest['id'],
-        $sellPrice,
-        $product['product_name'],
-        $digiflazzResponse['ref_id'] ?? $refId,
-        'Digiflazz order via WhatsApp',
-        'digiflazz'
-    );
-
-    if (!$deductResult['success']) {
-        sendWhatsAppMessage($phone, "❌ Gagal memotong saldo: " . $deductResult['message']);
-        return;
-    }
-
-    try {
-        $transactionStmt = $pdo->prepare('INSERT INTO digiflazz_transactions (
-            agent_id, ref_id, buyer_sku_code, customer_no, customer_name, status, message, price, sell_price, serial_number, response
-        ) VALUES (
-            :agent_id, :ref_id, :sku, :customer_no, :customer_name, :status, :message, :price, :sell_price, :serial, :response
-        )');
-
-        $transactionStmt->execute([
-            ':agent_id' => $agentLatest['id'],
-            ':ref_id' => $digiflazzResponse['ref_id'] ?? $refId,
-            ':sku' => $product['buyer_sku_code'],
-            ':customer_no' => $customerNo,
-            ':customer_name' => $customerName,
-            ':status' => strtolower($digiflazzResponse['status'] ?? 'pending'),
-            ':message' => $digiflazzResponse['message'] ?? '',
-            ':price' => $costPrice,
-            ':sell_price' => $sellPrice,
-            ':serial' => $digiflazzResponse['sn'] ?? '',
-            ':response' => json_encode($digiflazzResponse)
-        ]);
-
-        if (!empty($digiflazzResponse['sn'])) {
-            $voucherStmt = $pdo->prepare('INSERT INTO agent_vouchers (
-                agent_id, transaction_id, username, password, profile_name, buy_price, sell_price, status, customer_phone, customer_name, sent_via
-            ) VALUES (
-                :agent_id, :transaction_id, :username, :password, :profile_name, :buy_price, :sell_price, :status, :customer_phone, :customer_name, :sent_via
-            )');
-            $voucherStmt->execute([
-                ':agent_id' => $agentLatest['id'],
-                ':transaction_id' => $deductResult['transaction_id'],
-                ':username' => $digiflazzResponse['sn'],
-                ':password' => $digiflazzResponse['sn'],
-                ':profile_name' => $product['product_name'],
-                ':buy_price' => $costPrice,
-                ':sell_price' => $sellPrice,
-                ':status' => 'active',
-                ':customer_phone' => $customerNo,
-                ':customer_name' => $customerName,
-                ':sent_via' => 'whatsapp'
-            ]);
+        if (!$product) {
+            error_log("processDigiflazzPurchaseAdmin - Product not found: $sku");
+            $reply = "❌ Produk dengan SKU *{$sku}* tidak ditemukan atau tidak aktif.\n";
+            $reply .= "Gunakan perintah: *PULSA <SKU> <NO_HP> [Nama]*\n";
+            $reply .= "Cek katalog di menu Digital Products untuk melihat SKU yang tersedia.";
+            sendWhatsAppMessage($phone, $reply);
+            return;
         }
-    } catch (Exception $dbException) {
-        $agent->topupBalance(
+        
+        error_log("processDigiflazzPurchaseAdmin - Product found: " . $product['product_name']);
+
+        $costPrice = (int)$product['price'];
+        if ($costPrice <= 0 && isset($product['buyer_price'])) {
+            $costPrice = (int)$product['buyer_price'];
+        }
+
+        if ($costPrice <= 0) {
+            error_log("processDigiflazzPurchaseCommand - Invalid product price: $sku");
+            sendWhatsAppMessage($phone, "❌ Harga produk tidak valid untuk SKU {$sku}. Coba produk lain atau hubungi admin.");
+            return;
+        }
+
+        $sellPrice = (int)($product['seller_price'] ?? 0);
+        if ($sellPrice <= 0) {
+            $sellPrice = $costPrice;
+            if (!empty($defaultMarkupNominal) && $defaultMarkupNominal > 0) {
+                $sellPrice += $defaultMarkupNominal;
+            }
+        }
+
+        if ($sellPrice < $costPrice) {
+            $sellPrice = $costPrice;
+        }
+
+        $agentLatest = $agent->getAgentById($agentData['id']);
+        if (!$agentLatest || $agentLatest['status'] !== 'active') {
+            error_log("processDigiflazzPurchaseCommand - Agent data not found or not active");
+            sendWhatsAppMessage($phone, "❌ Akun agent tidak ditemukan atau tidak aktif.");
+            return;
+        }
+
+        if ($agentLatest['balance'] < $sellPrice) {
+            error_log("processDigiflazzPurchaseCommand - Insufficient balance. Balance: " . $agentLatest['balance'] . ", Required: $sellPrice");
+            $reply = "❌ *SALDO TIDAK CUKUP*\n\n";
+            $reply .= "Saldo Anda: " . formatRupiah($agentLatest['balance']) . "\n";
+            $reply .= "Harga Produk: " . formatRupiah($sellPrice) . "\n";
+            $reply .= "Kurang: " . formatRupiah($sellPrice - $agentLatest['balance']) . "\n\n";
+            $reply .= "Silakan topup saldo terlebih dahulu.";
+            sendWhatsAppMessage($phone, $reply);
+            return;
+        }
+
+        $refId = $digiflazzClient->generateRefId('WA' . $agentLatest['agent_code']);
+
+        $orderPayload = [
+            'buyer_sku_code' => $product['buyer_sku_code'],
+            'customer_no' => $customerNo,
+            'ref_id' => $refId,
+        ];
+
+        $customerName = trim($customerNameInput);
+        if ($customerName !== '') {
+            $orderPayload['customer_name'] = $customerName;
+        }
+
+        try {
+            error_log("processDigiflazzPurchaseCommand - Creating transaction with payload: " . json_encode($orderPayload));
+            $digiflazzResponse = $digiflazzClient->createTransaction($orderPayload);
+            error_log("processDigiflazzPurchaseCommand - Transaction response: " . json_encode($digiflazzResponse));
+        } catch (Exception $e) {
+            error_log("processDigiflazzPurchaseCommand - Transaction failed: " . $e->getMessage());
+            sendWhatsAppMessage($phone, "❌ Transaksi Digiflazz gagal: " . $e->getMessage());
+            return;
+        }
+
+        $deductResult = $agent->deductBalance(
             $agentLatest['id'],
-            $costPrice,
-            'Refund Digiflazz order failure (WhatsApp): ' . $product['product_name'],
-            'system'
+            $sellPrice,
+            $product['product_name'],
+            $digiflazzResponse['ref_id'] ?? $refId,
+            'Digiflazz order via WhatsApp',
+            'digiflazz'
         );
-        sendWhatsAppMessage($phone, "❌ Gagal menyimpan data transaksi. " . $dbException->getMessage());
-        return;
+
+        if (!$deductResult['success']) {
+            error_log("processDigiflazzPurchaseCommand - Balance deduction failed: " . $deductResult['message']);
+            sendWhatsAppMessage($phone, "❌ Gagal memotong saldo: " . $deductResult['message']);
+            return;
+        }
+
+        try {
+            $transactionStmt = $pdo->prepare('INSERT INTO digiflazz_transactions (
+                agent_id, ref_id, buyer_sku_code, customer_no, customer_name, status, message, price, sell_price, serial_number, response
+            ) VALUES (
+                :agent_id, :ref_id, :sku, :customer_no, :customer_name, :status, :message, :price, :sell_price, :serial, :response
+            )');
+
+            $transactionStmt->execute([
+                ':agent_id' => $agentLatest['id'],
+                ':ref_id' => $digiflazzResponse['ref_id'] ?? $refId,
+                ':sku' => $product['buyer_sku_code'],
+                ':customer_no' => $customerNo,
+                ':customer_name' => $customerName,
+                ':status' => strtolower($digiflazzResponse['status'] ?? 'pending'),
+                ':message' => $digiflazzResponse['message'] ?? '',
+                ':price' => $costPrice,
+                ':sell_price' => $sellPrice,
+                ':serial' => $digiflazzResponse['sn'] ?? '',
+                ':response' => json_encode($digiflazzResponse)
+            ]);
+
+            if (!empty($digiflazzResponse['sn'])) {
+                $voucherStmt = $pdo->prepare('INSERT INTO agent_vouchers (
+                    agent_id, transaction_id, username, password, profile_name, buy_price, sell_price, status, customer_phone, customer_name, sent_via
+                ) VALUES (
+                    :agent_id, :transaction_id, :username, :password, :profile_name, :buy_price, :sell_price, :status, :customer_phone, :customer_name, :sent_via
+                )');
+                $voucherStmt->execute([
+                    ':agent_id' => $agentLatest['id'],
+                    ':transaction_id' => $deductResult['transaction_id'],
+                    ':username' => $digiflazzResponse['sn'],
+                    ':password' => $digiflazzResponse['sn'],
+                    ':profile_name' => $product['product_name'],
+                    ':buy_price' => $costPrice,
+                    ':sell_price' => $sellPrice,
+                    ':status' => 'active',
+                    ':customer_phone' => $customerNo,
+                    ':customer_name' => $customerName,
+                    ':sent_via' => 'whatsapp'
+                ]);
+            }
+        } catch (Exception $dbException) {
+            error_log("processDigiflazzPurchaseCommand - Database error: " . $dbException->getMessage());
+            $agent->topupBalance(
+                $agentLatest['id'],
+                $costPrice,
+                'Refund Digiflazz order failure (WhatsApp): ' . $product['product_name'],
+                'system'
+            );
+            sendWhatsAppMessage($phone, "❌ Gagal menyimpan data transaksi. " . $dbException->getMessage());
+            return;
+        }
+
+        $updatedAgent = $agent->getAgentById($agentLatest['id']);
+
+        $notification = new WhatsAppNotification();
+        $notified = $notification->notifyDigiflazzSuccess($agentLatest['id'], [
+            'product_name' => $product['product_name'],
+            'customer_no' => $customerNo,
+            'customer_name' => $customerName,
+            'status' => $digiflazzResponse['status'] ?? 'pending',
+            'message' => $digiflazzResponse['message'] ?? '',
+            'ref_id' => $digiflazzResponse['ref_id'] ?? $refId,
+            'serial_number' => $digiflazzResponse['sn'] ?? '',
+            'price' => $sellPrice
+        ], $updatedAgent['balance']);
+
+        if (!$notified) {
+            $content  = "⚡ *TRANSAKSI DIGIFLAZZ*\n\n";
+            $content .= "Produk : *{$product['product_name']}*\n";
+            $content .= "Nomor  : `{$customerNo}`\n";
+            if (!empty($customerName)) {
+                $content .= "Nama   : {$customerName}\n";
+            }
+            $content .= "Status : *" . strtoupper($digiflazzResponse['status'] ?? 'PENDING') . "*\n";
+            $content .= "Ref ID : " . ($digiflazzResponse['ref_id'] ?? $refId) . "\n";
+            $content .= "Biaya  : " . formatRupiah($sellPrice) . "\n";
+            if (!empty($digiflazzResponse['sn'])) {
+                $content .= "SN     : `{$digiflazzResponse['sn']}`\n";
+            }
+            $content .= "\nSaldo tersisa: " . formatRupiah($updatedAgent['balance']);
+            error_log("processDigiflazzPurchaseCommand - Sending success message");
+            sendWhatsAppMessage($phone, formatMessage($content));
+        }
+    } catch (Exception $e) {
+        error_log("processDigiflazzPurchaseCommand - Unexpected error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+        sendWhatsAppMessage($phone, "❌ Terjadi kesalahan tidak terduga. Silakan coba lagi atau hubungi administrator.");
     }
+}
 
-    $updatedAgent = $agent->getAgentById($agentLatest['id']);
+/**
+ * Process Digiflazz purchase command for admin (no balance deduction)
+ */
+function processDigiflazzPurchaseAdmin($phone, $adminData, $sku, $customerNumberInput, $customerNameInput = '') {
+    try {
+        error_log("processDigiflazzPurchaseAdmin called - Phone: $phone, SKU: $sku");
+        
+        // For admin, we don't check balance but still validate other requirements
+        $customerNo = preg_replace('/\D+/', '', $customerNumberInput);
+        if (strlen($customerNo) < 5) {
+            error_log("processDigiflazzPurchaseAdmin - Invalid customer number: $customerNumberInput");
+            sendWhatsAppMessage($phone, "❌ Nomor tujuan tidak valid. Pastikan hanya berisi angka dan minimal 5 digit.");
+            return;
+        }
 
-    $notification = new WhatsAppNotification();
-    $notified = $notification->notifyDigiflazzSuccess($agentLatest['id'], [
-        'product_name' => $product['product_name'],
-        'customer_no' => $customerNo,
-        'customer_name' => $customerName,
-        'status' => $digiflazzResponse['status'] ?? 'pending',
-        'message' => $digiflazzResponse['message'] ?? '',
-        'ref_id' => $digiflazzResponse['ref_id'] ?? $refId,
-        'serial_number' => $digiflazzResponse['sn'] ?? '',
-        'price' => $sellPrice
-    ], $updatedAgent['balance']);
+        try {
+            $digiflazzClient = new DigiflazzClient();
+            if (!$digiflazzClient->isEnabled()) {
+                error_log("processDigiflazzPurchaseAdmin - Digiflazz not enabled");
+                sendWhatsAppMessage($phone, "❌ Integrasi Digiflazz belum dikonfigurasi. Hubungi administrator.");
+                return;
+            }
+            $digiflazzSettings = $digiflazzClient->getSettings();
+            $defaultMarkupNominal = isset($digiflazzSettings['default_markup_nominal']) ? (int)$digiflazzSettings['default_markup_nominal'] : 0;
+        } catch (Exception $e) {
+            error_log("processDigiflazzPurchaseAdmin - Exception: " . $e->getMessage());
+            sendWhatsAppMessage($phone, "❌ Gagal menginisialisasi Digiflazz: " . $e->getMessage());
+            return;
+        }
 
-    if (!$notified) {
-        $content  = "⚡ *TRANSAKSI DIGIFLAZZ*\n\n";
+        $pdo = getDBConnection();
+        $stmt = $pdo->prepare('SELECT * FROM digiflazz_products WHERE buyer_sku_code = :sku AND status = "active" LIMIT 1');
+        $stmt->execute([':sku' => $sku]);
+        $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$product) {
+            $stmt = $pdo->prepare('SELECT * FROM digiflazz_products WHERE UPPER(product_name) = :name AND status = "active" LIMIT 1');
+            $stmt->execute([':name' => strtoupper($sku)]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$product) {
+            error_log("processDigiflazzPurchaseAdmin - Product not found: $sku");
+            $reply = "❌ Produk dengan SKU *{$sku}* tidak ditemukan atau tidak aktif.\n";
+            $reply .= "Gunakan perintah: *PULSA <SKU> <NO_HP> [Nama]*\n";
+            $reply .= "Cek katalog di menu Digital Products untuk melihat SKU yang tersedia.";
+            sendWhatsAppMessage($phone, $reply);
+            return;
+        }
+        
+        error_log("processDigiflazzPurchaseAdmin - Product found: " . $product['product_name']);
+
+        $costPrice = (int)$product['price'];
+        if ($costPrice <= 0 && isset($product['buyer_price'])) {
+            $costPrice = (int)$product['buyer_price'];
+        }
+
+        if ($costPrice <= 0) {
+            error_log("processDigiflazzPurchaseAdmin - Invalid product price: $sku");
+            sendWhatsAppMessage($phone, "❌ Harga produk tidak valid untuk SKU {$sku}. Coba produk lain atau hubungi admin.");
+            return;
+        }
+
+        $sellPrice = (int)($product['seller_price'] ?? 0);
+        if ($sellPrice <= 0) {
+            $sellPrice = $costPrice;
+            if (!empty($defaultMarkupNominal) && $defaultMarkupNominal > 0) {
+                $sellPrice += $defaultMarkupNominal;
+            }
+        }
+
+        if ($sellPrice < $costPrice) {
+            $sellPrice = $costPrice;
+        }
+
+        // For admin, we don't check balance but still process the transaction
+        $refId = $digiflazzClient->generateRefId('ADMIN-WA');
+
+        $orderPayload = [
+            'buyer_sku_code' => $product['buyer_sku_code'],
+            'customer_no' => $customerNo,
+            'ref_id' => $refId,
+        ];
+
+        $customerName = trim($customerNameInput);
+        if ($customerName !== '') {
+            $orderPayload['customer_name'] = $customerName;
+        }
+
+        try {
+            error_log("processDigiflazzPurchaseAdmin - Creating transaction with payload: " . json_encode($orderPayload));
+            $digiflazzResponse = $digiflazzClient->createTransaction($orderPayload);
+            error_log("processDigiflazzPurchaseAdmin - Transaction response: " . json_encode($digiflazzResponse));
+        } catch (Exception $e) {
+            error_log("processDigiflazzPurchaseAdmin - Transaction failed: " . $e->getMessage());
+            sendWhatsAppMessage($phone, "❌ Transaksi Digiflazz gagal: " . $e->getMessage());
+            return;
+        }
+
+        // For admin, we don't deduct balance but still log the transaction
+        try {
+            $transactionStmt = $pdo->prepare('INSERT INTO digiflazz_transactions (
+                agent_id, ref_id, buyer_sku_code, customer_no, customer_name, status, message, price, sell_price, serial_number, response
+            ) VALUES (
+                :agent_id, :ref_id, :sku, :customer_no, :customer_name, :status, :message, :price, :sell_price, :serial, :response
+            )');
+
+            $transactionStmt->execute([
+                ':agent_id' => null, // No agent ID for admin transactions
+                ':ref_id' => $digiflazzResponse['ref_id'] ?? $refId,
+                ':sku' => $product['buyer_sku_code'],
+                ':customer_no' => $customerNo,
+                ':customer_name' => $customerName,
+                ':status' => strtolower($digiflazzResponse['status'] ?? 'pending'),
+                ':message' => $digiflazzResponse['message'] ?? '',
+                ':price' => $costPrice,
+                ':sell_price' => $sellPrice,
+                ':serial' => $digiflazzResponse['sn'] ?? '',
+                ':response' => json_encode($digiflazzResponse)
+            ]);
+
+            if (!empty($digiflazzResponse['sn'])) {
+                // Store as admin voucher
+                $voucherStmt = $pdo->prepare('INSERT INTO agent_vouchers (
+                    agent_id, transaction_id, username, password, profile_name, buy_price, sell_price, status, customer_phone, customer_name, sent_via
+                ) VALUES (
+                    :agent_id, :transaction_id, :username, :password, :profile_name, :buy_price, :sell_price, :status, :customer_phone, :customer_name, :sent_via
+                )');
+                $voucherStmt->execute([
+                    ':agent_id' => null, // No agent ID for admin transactions
+                    ':transaction_id' => 0, // No transaction ID for admin
+                    ':username' => $digiflazzResponse['sn'],
+                    ':password' => $digiflazzResponse['sn'],
+                    ':profile_name' => $product['product_name'],
+                    ':buy_price' => $costPrice,
+                    ':sell_price' => $sellPrice,
+                    ':status' => 'active',
+                    ':customer_phone' => $customerNo,
+                    ':customer_name' => $customerName,
+                    ':sent_via' => 'whatsapp_admin'
+                ]);
+            }
+        } catch (Exception $dbException) {
+            error_log("processDigiflazzPurchaseAdmin - Database error: " . $dbException->getMessage());
+            sendWhatsAppMessage($phone, "❌ Gagal menyimpan data transaksi. " . $dbException->getMessage());
+            return;
+        }
+
+        // Send success notification to admin
+        $content  = "⚡ *TRANSAKSI DIGIFLAZZ (ADMIN)*\n\n";
         $content .= "Produk : *{$product['product_name']}*\n";
         $content .= "Nomor  : `{$customerNo}`\n";
         if (!empty($customerName)) {
@@ -1274,12 +1502,16 @@ function processDigiflazzPurchaseCommand($phone, $agentData, $sku, $customerNumb
         }
         $content .= "Status : *" . strtoupper($digiflazzResponse['status'] ?? 'PENDING') . "*\n";
         $content .= "Ref ID : " . ($digiflazzResponse['ref_id'] ?? $refId) . "\n";
-        $content .= "Biaya  : " . formatRupiah($sellPrice) . "\n";
         if (!empty($digiflazzResponse['sn'])) {
             $content .= "SN     : `{$digiflazzResponse['sn']}`\n";
         }
-        $content .= "\nSaldo tersisa: " . formatRupiah($updatedAgent['balance']);
+        $content .= "\n✅ Transaksi berhasil (tanpa pemotongan saldo)";
+        
+        error_log("processDigiflazzPurchaseAdmin - Sending success message");
         sendWhatsAppMessage($phone, formatMessage($content));
+    } catch (Exception $e) {
+        error_log("processDigiflazzPurchaseAdmin - Unexpected error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+        sendWhatsAppMessage($phone, "❌ Terjadi kesalahan tidak terduga. Silakan coba lagi atau hubungi administrator.");
     }
 }
 
