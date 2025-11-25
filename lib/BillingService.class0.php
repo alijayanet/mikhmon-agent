@@ -313,9 +313,9 @@ class BillingService
     public function createCustomer(array $data): int
     {
         $sql = "INSERT INTO billing_customers
-                    (profile_id, name, phone, email, address, service_number, genieacs_match_mode, genieacs_pppoe_username, billing_day, status, is_isolated, notes)
+                    (profile_id, name, phone, email, address, service_number, genieacs_match_mode, genieacs_pppoe_username, billing_day, auto_isolation, status, is_isolated, notes)
                 VALUES
-                    (:profile_id, :name, :phone, :email, :address, :service_number, :genieacs_match_mode, :genieacs_pppoe_username, :billing_day, :status, :is_isolated, :notes)";
+                    (:profile_id, :name, :phone, :email, :address, :service_number, :genieacs_match_mode, :genieacs_pppoe_username, :billing_day, :auto_isolation, :status, :is_isolated, :notes)";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             ':profile_id' => $data['profile_id'],
@@ -327,6 +327,7 @@ class BillingService
             ':genieacs_match_mode' => 'pppoe_username',
             ':genieacs_pppoe_username' => $data['genieacs_pppoe_username'] ?? null,
             ':billing_day' => $data['billing_day'],
+            ':auto_isolation' => $data['auto_isolation'] ?? 1,
             ':status' => $data['status'] ?? 'active',
             ':is_isolated' => $data['is_isolated'] ?? 0,
             ':notes' => $data['notes'] ?? null,
@@ -346,6 +347,7 @@ class BillingService
                     genieacs_match_mode = :genieacs_match_mode,
                     genieacs_pppoe_username = :genieacs_pppoe_username,
                     billing_day = :billing_day,
+                    auto_isolation = :auto_isolation,
                     status = :status,
                     is_isolated = :is_isolated,
                     notes = :notes
@@ -362,6 +364,7 @@ class BillingService
             ':genieacs_match_mode' => 'pppoe_username',
             ':genieacs_pppoe_username' => $data['genieacs_pppoe_username'] ?? null,
             ':billing_day' => $data['billing_day'],
+            ':auto_isolation' => $data['auto_isolation'] ?? 1,
             ':status' => $data['status'] ?? 'active',
             ':is_isolated' => $data['is_isolated'] ?? 0,
             ':notes' => $data['notes'] ?? null,
@@ -1104,40 +1107,35 @@ class BillingService
         return $genie;
     }
 
-    private function resolveGenieAcsDeviceId(GenieACS $genie, array $customer): string
+    public function resolveGenieAcsDeviceId(GenieACS $genie, array $customer): string
     {
+        // 1. Try PPPoE Username
         $username = trim((string)($customer['genieacs_pppoe_username'] ?? ''));
-        if ($username === '') {
-            throw new InvalidArgumentException('PPPoE username pelanggan kosong.');
+        if ($username !== '') {
+            try {
+                return $this->findDeviceIdByPppoeUsername($genie, $username);
+            } catch (RuntimeException $e) {
+                // Ignore and try next method
+            }
         }
 
-        try {
-            return $this->findDeviceIdByPppoeUsername($genie, $username);
-        } catch (RuntimeException $pppoeError) {
-            $phone = trim((string)($customer['phone'] ?? ''));
-            if ($phone === '') {
-                throw $pppoeError;
-            }
-
+        // 2. Try Phone Tag
+        $phone = trim((string)($customer['phone'] ?? ''));
+        if ($phone !== '') {
             try {
                 return $this->findDeviceIdByPhoneTag($genie, $phone);
-            } catch (RuntimeException $phoneError) {
-                $serviceNumber = trim((string)($customer['service_number'] ?? ''));
-                if ($serviceNumber !== '') {
-                    return $serviceNumber;
-                }
-
-                throw new RuntimeException(
-                    sprintf(
-                        'Tidak dapat menemukan perangkat GenieACS untuk pelanggan ini. PPPoE username "%s" dan tag nomor telepon "%s" tidak ditemukan.',
-                        $username,
-                        $phone
-                    ),
-                    0,
-                    $phoneError
-                );
+            } catch (RuntimeException $e) {
+                // Ignore and try next method
             }
         }
+
+        // 3. Try Service Number (as direct Device ID)
+        $serviceNumber = trim((string)($customer['service_number'] ?? ''));
+        if ($serviceNumber !== '') {
+            return $serviceNumber;
+        }
+
+        throw new RuntimeException('Tidak dapat menemukan perangkat GenieACS. Pastikan PPPoE Username atau Nomor HP sesuai.');
     }
 
     private function findDeviceIdByPhoneTag(GenieACS $genie, string $phone): string

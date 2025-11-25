@@ -124,24 +124,25 @@ class DigiflazzClient {
 
         $url = self::BASE_URL . '/' . ltrim($endpoint, '/');
 
-        $curl = curl_init();
-        curl_setopt_array($curl, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json'
-            ],
-            CURLOPT_TIMEOUT => 30
+        // Membuat context stream untuk HTTP request
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => [
+                    'Content-Type: application/json'
+                ],
+                'content' => json_encode($payload),
+                'timeout' => 30
+            ]
         ]);
 
-        $response = curl_exec($curl);
-        $error = curl_error($curl);
-        curl_close($curl);
-
-        if ($error) {
-            throw new Exception('Koneksi ke Digiflazz gagal: ' . $error);
+        // Melakukan request menggunakan file_get_contents
+        $response = file_get_contents($url, false, $context);
+        
+        // Memeriksa error
+        if ($response === false) {
+            $error = error_get_last();
+            throw new Exception('Koneksi ke Digiflazz gagal: ' . ($error['message'] ?? 'Unknown error'));
         }
 
         $decoded = json_decode($response, true);
@@ -186,8 +187,8 @@ class DigiflazzClient {
             $report['postpaid'] = $this->syncCategory('pasca');
 
             // Update last sync timestamp
-            $stmt = $this->db->prepare("INSERT INTO agent_settings (setting_key, setting_value, setting_type, description, updated_by)
-                    VALUES ('digiflazz_last_sync', NOW(), 'datetime', 'Last price list sync timestamp', 'system')
+            $stmt = $this->db->prepare("INSERT INTO agent_settings (agent_id, setting_key, setting_value, setting_type, description, updated_by)
+                    VALUES (1, 'digiflazz_last_sync', NOW(), 'datetime', 'Last price list sync timestamp', 'system')
                     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_by = 'system'");
             $stmt->execute();
 
