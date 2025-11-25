@@ -1,0 +1,63 @@
+[18-Nov-2025 13:44:04 Asia/Jakarta] PublicPayment - Constructor called with gateway: null
+[18-Nov-2025 13:44:04 Asia/Jakarta] PublicPayment - Getting methods for gateway: tripay with amount: 100000
+[18-Nov-2025 13:44:04 Asia/Jakarta] PublicPayment - SQL: SELECT * FROM payment_methods 
+                WHERE gateway_name = :gateway AND is_active = 1 AND min_amount <= :min_amount AND max_amount >= :max_amount ORDER BY sort_order, id
+[18-Nov-2025 13:44:04 Asia/Jakarta] PublicPayment - Params: {":gateway":"tripay",":min_amount":100000,":max_amount":100000}
+[18-Nov-2025 13:44:04 Asia/Jakarta] PublicPayment - Found 12 payment methods for amount 100000
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Constructor called with gateway: null
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Getting methods for gateway: tripay with amount: 100000
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - SQL: SELECT * FROM payment_methods 
+                WHERE gateway_name = :gateway AND is_active = 1 AND min_amount <= :min_amount AND max_amount >= :max_amount ORDER BY sort_order, id
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Params: {":gateway":"tripay",":min_amount":100000,":max_amount":100000}
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Found 12 payment methods for amount 100000
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - createPayment called for gateway: tripay
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Payment data: {"payment_method":"DANA","amount":102500,"customer_name":"sarwan carinih","customer_phone":"628900000","customer_email":"email@contoh.com","product_name":"Pembayaran Tagihan BRONZE","callback_url":"https:\/\/billing.alijaya.net\/api\/billing_payment_callback.php","return_url":"https:\/\/billing.alijaya.net\/public\/billing_payment_status.php"}
+[18-Nov-2025 13:52:42 Asia/Jakarta] Tripay Payment - Signature data: T46967INV-1763448762-3251102500
+[18-Nov-2025 13:52:42 Asia/Jakarta] Tripay Payment - Signature: 1980ed173c69fbc12ba77c200afe0f65515dacaeef6b77d78699e22865ee3a4f
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Constructor called with gateway: null
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Getting methods for gateway: tripay with amount: 100000
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - SQL: SELECT * FROM payment_methods 
+                WHERE gateway_name = :gateway AND is_active = 1 AND min_amount <= :min_amount AND max_amount >= :max_amount ORDER BY sort_order, id
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Params: {":gateway":"tripay",":min_amount":100000,":max_amount":100000}
+[18-Nov-2025 13:52:42 Asia/Jakarta] PublicPayment - Found 12 payment methods for amount 100000
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Constructor called with gateway: null
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Getting methods for gateway: tripay with amount: 100000
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - SQL: SELECT * FROM payment_methods 
+                WHERE gateway_name = :gateway AND is_active = 1 AND min_amount <= :min_amount AND max_amount >= :max_amount ORDER BY sort_order, id
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Params: {":gateway":"tripay",":min_amount":100000,":max_amount":100000}
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Found 12 payment methods for amount 100000
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - createPayment called for gateway: tripay
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Payment data: {"payment_method":"DANA","amount":102500,"customer_name":"sarwan carinih","customer_phone":"628900000","customer_email":"email@contoh.com","product_name":"Pembayaran Tagihan BRONZE","callback_url":"https:\/\/billing.alijaya.net\/api\/billing_payment_callback.php","return_url":"https:\/\/billing.alijaya.net\/public\/billing_payment_status.php"}
+[18-Nov-2025 13:52:50 Asia/Jakarta] Tripay Payment - Signature data: T46967INV-1763448770-8370102500
+[18-Nov-2025 13:52:50 Asia/Jakarta] Tripay Payment - Signature: 054bf8ab1f100de28c1d899d9198b862bf38a390db0619ad8c2e56ba55f88ca1
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Constructor called with gateway: null
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Getting methods for gateway: tripay with amount: 100000
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - SQL: SELECT * FROM payment_methods 
+                WHERE gateway_name = :gateway AND is_active = 1 AND min_amount <= :min_amount AND max_amount >= :max_amount ORDER BY sort_order, id
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Params: {":gateway":"tripay",":min_amount":100000,":max_amount":100000}
+[18-Nov-2025 13:52:50 Asia/Jakarta] PublicPayment - Found 12 payment methods for amount 100000
+[24-Nov-2025 07:23:03 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:23:19 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:24:11 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:26:20 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:26:20 Asia/Jakarta] Billing Portal WiFi fetch trace: #0 /home/alijayan/billing.alijaya.net/public/billing_portal.php(117): GenieACS->__construct()
+#1 {main}
+[24-Nov-2025 07:26:35 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:26:35 Asia/Jakarta] Billing Portal WiFi fetch trace: #0 /home/alijayan/billing.alijaya.net/public/billing_portal.php(117): GenieACS->__construct()
+#1 {main}
+[24-Nov-2025 07:26:55 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:26:55 Asia/Jakarta] Billing Portal WiFi fetch trace: #0 /home/alijayan/billing.alijaya.net/public/billing_portal.php(117): GenieACS->__construct()
+#1 {main}
+[24-Nov-2025 07:28:54 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 07:28:54 Asia/Jakarta] Billing Portal WiFi fetch trace: #0 /home/alijayan/billing.alijaya.net/public/billing_portal.php(117): GenieACS->__construct()
+#1 {main}
+[24-Nov-2025 07:29:43 Asia/Jakarta] Billing Portal WiFi fetch error: Undefined constant "GENIEACS_API_URL"
+[24-Nov-2025 01:01:39 UTC] PHP Parse error:  syntax error, unexpected token "endif", expecting end of file in /home/alijayan/billing.alijaya.net/public/billing_portal.php on line 636
+[24-Nov-2025 01:01:45 UTC] PHP Parse error:  syntax error, unexpected token "endif", expecting end of file in /home/alijayan/billing.alijaya.net/public/billing_portal.php on line 636
+[24-Nov-2025 01:01:59 UTC] PHP Parse error:  syntax error, unexpected token "endif", expecting end of file in /home/alijayan/billing.alijaya.net/public/billing_portal.php on line 636
+[24-Nov-2025 01:02:21 UTC] PHP Parse error:  syntax error, unexpected token "endif", expecting end of file in /home/alijayan/billing.alijaya.net/public/billing_portal.php on line 636
+[24-Nov-2025 01:02:35 UTC] PHP Parse error:  syntax error, unexpected token "endif", expecting end of file in /home/alijayan/billing.alijaya.net/public/billing_portal.php on line 636
+[24-Nov-2025 09:15:10 Asia/Jakarta] Billing Portal WiFi fetch error: Call to private method BillingService::resolveGenieAcsDeviceId() from global scope
+[24-Nov-2025 09:15:32 Asia/Jakarta] Billing Portal WiFi fetch error: Call to private method BillingService::resolveGenieAcsDeviceId() from global scope
+[24-Nov-2025 09:49:15 Asia/Jakarta] Billing Portal WiFi fetch error: Call to private method BillingService::resolveGenieAcsDeviceId() from global scope
+[24-Nov-2025 09:49:26 Asia/Jakarta] Billing Portal WiFi fetch error: Call to private method BillingService::resolveGenieAcsDeviceId() from global scope

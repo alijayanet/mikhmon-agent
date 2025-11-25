@@ -3,9 +3,9 @@
  * Billing automation cron script.
  *
  * Tasks handled:
- *  - Generate monthly invoices for active customers on 1st of each month.
+ *  - Generate monthly invoices for active customers.
  *  - Send WhatsApp reminders before due date.
- *  - Mark invoices overdue & apply isolation based on customer-specific isolation date.
+ *  - Mark invoices overdue & apply isolation after grace period.
  *  - Restore customer status after payment.
  *
  * Usage:
@@ -27,11 +27,7 @@ $now = new DateTime('today');
 
 logMessage('Starting billing cron');
 
-// Generate invoices only on 1st of each month for all customers
-if ($now->format('j') == 1) {
-    generateMonthlyInvoices($service, $now);
-}
-
+generateMonthlyInvoices($service, $now);
 sendReminders($service, $notification, $settings, $now);
 handleIsolation($service, $notification, $settings, $now);
 
@@ -77,11 +73,20 @@ function loadBillingSettings(BillingService $service): array
     ];
 }
 
-// Generate invoices for all customers on 1st of month with due date based on isolation date
+function computeDueDate(DateTime $reference, int $billingDay): DateTime
+{
+    $year = (int)$reference->format('Y');
+    $month = (int)$reference->format('m');
+
+    $lastDay = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+    $day = min(max(1, $billingDay), $lastDay);
+
+    return new DateTime(sprintf('%04d-%02d-%02d', $year, $month, $day));
+}
+
 function generateMonthlyInvoices(BillingService $service, DateTime $today): void
 {
     $period = $today->format('Y-m');
-    
     $customers = $service->getActiveCustomersWithProfile();
 
     foreach ($customers as $customer) {
@@ -90,19 +95,7 @@ function generateMonthlyInvoices(BillingService $service, DateTime $today): void
             continue;
         }
 
-        // Use customer's isolation date as due date
-        $isolationDate = (int)($customer['billing_day'] ?? 20);
-        $isolationDate = max(1, min(28, $isolationDate));
-        
-        // Set due date to the isolation date of current month
-        $dueDate = clone $today;
-        $dueDate->setDate((int)$today->format('Y'), (int)$today->format('m'), $isolationDate);
-        
-        // If isolation date has passed this month, set to next month
-        if ($dueDate < $today) {
-            $dueDate->modify('first day of next month');
-            $dueDate->setDate((int)$dueDate->format('Y'), (int)$dueDate->format('m'), $isolationDate);
-        }
+        $dueDate = computeDueDate($today, (int)$customer['billing_day']);
 
         $invoiceId = $service->generateInvoice(
             (int)$customer['id'],
@@ -122,7 +115,7 @@ function generateMonthlyInvoices(BillingService $service, DateTime $today): void
             'due_date' => $dueDate->format('Y-m-d'),
         ]);
 
-        logMessage("Generated invoice {$invoiceId} for customer {$customer['id']} (period {$period}, due {$dueDate->format('Y-m-d')})");
+        logMessage("Generated invoice {$invoiceId} for customer {$customer['id']} (period {$period})");
     }
 }
 
@@ -186,7 +179,7 @@ function sendReminders(BillingService $service, WhatsAppNotification $notificati
 
 function handleIsolation(BillingService $service, WhatsAppNotification $notification, array $settings, DateTime $today): void
 {
-    // Get all invoices
+    $isolationDelay = (int)$settings['isolation_delay'];
     $invoices = $service->listInvoices([], 1000);
 
     foreach ($invoices as $invoice) {
@@ -195,48 +188,41 @@ function handleIsolation(BillingService $service, WhatsAppNotification $notifica
             continue;
         }
 
-        // Get customer to check their isolation settings
-        $customer = $service->getCustomerById((int)$invoice['customer_id']);
-        if (!$customer) {
+        $dueDate = new DateTime($invoice['due_date']);
+        if ($today <= $dueDate) {
             continue;
         }
 
-        // Check if customer has auto-isolation enabled
-        $autoIsolation = (int)($customer['auto_isolation'] ?? 1); // Default to enabled
-        if ($autoIsolation !== 1) {
-            continue; // Skip isolation for customers with auto-isolation disabled
+        $daysOverdue = (int)$dueDate->diff($today)->format('%a');
+
+        if ($status === 'unpaid') {
+            $service->setInvoiceStatus((int)$invoice['id'], 'overdue');
+            $status = 'overdue';
         }
 
-        // Use customer-specific isolation date
-        $isolationDate = (int)($customer['billing_day'] ?? 20);
-        $isolationDate = max(1, min(28, $isolationDate));
-        
-        // Check if today is the isolation date for this customer
-        $todayDay = (int)$today->format('j');
-        
-        if ($todayDay == $isolationDate) {
-            // Check if customer is already isolated
-            if ((int)$customer['is_isolated'] === 1) {
-                continue;
-            }
+        if ($daysOverdue < $isolationDelay) {
+            continue;
+        }
 
-            // Isolate the customer
-            $service->updateCustomerIsolation((int)$customer['id'], 1);
-            $service->logEvent((int)$customer['id'], (int)$invoice['id'], 'billing_isolation_applied', [
-                'isolation_date' => $isolationDate,
-                'reason' => 'customer_specific_isolation_date_reached'
+        $customer = $service->getCustomerById((int)$invoice['customer_id']);
+        if (!$customer || (int)$customer['is_isolated'] === 1) {
+            continue;
+        }
+
+        $service->updateCustomerIsolation((int)$customer['id'], 1);
+        $service->logEvent((int)$customer['id'], (int)$invoice['id'], 'billing_isolation_applied', [
+            'days_overdue' => $daysOverdue,
+        ]);
+
+        if (!empty($customer['phone'])) {
+            $notification->notifyBillingIsolation($customer['phone'], [
+                'customer_name' => $customer['name'] ?? 'Pelanggan',
+                'period' => $invoice['period'] ?? '-',
+                'amount_formatted' => 'Rp ' . number_format($invoice['amount'] ?? 0, 0, ',', '.'),
             ]);
-
-            if (!empty($customer['phone'])) {
-                $notification->notifyBillingIsolation($customer['phone'], [
-                    'customer_name' => $customer['name'] ?? 'Pelanggan',
-                    'period' => $invoice['period'] ?? '-',
-                    'amount_formatted' => 'Rp ' . number_format($invoice['amount'] ?? 0, 0, ',', '.'),
-                ]);
-            }
-
-            logMessage("Isolation applied for customer {$customer['id']} (invoice {$invoice['id']}) on their specific isolation date");
         }
+
+        logMessage("Isolation applied for customer {$customer['id']} (invoice {$invoice['id']})");
     }
 
     // Restore customers whose latest invoice is paid
@@ -274,3 +260,4 @@ function buildPortalUrl(string $baseUrl, ?string $serviceNumber): string
     $separator = (parse_url($baseUrl, PHP_URL_QUERY) === null) ? '?' : '&';
     return $baseUrl . $separator . 'service=' . urlencode($serviceNumber);
 }
+*** End of File

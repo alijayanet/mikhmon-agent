@@ -385,7 +385,6 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
     <meta name="theme-color" content="<?= $themecolor; ?>" />
     <link rel="stylesheet" type="text/css" href="../css/font-awesome/css/font-awesome.min.css" />
     <link rel="stylesheet" href="../css/mikhmon-ui.<?= $theme; ?>.min.css">
-    <link rel="stylesheet" href="css/billing_portal_mobile.css">
     <link rel="icon" href="../img/favicon.png" />
     <style>
         body { background-color: #ecf0f5; font-family: 'Source Sans Pro', Arial, sans-serif; }
@@ -484,121 +483,7 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
         }
         @media (max-width: 768px) {
             .wrapper { padding: 10px; }
-            .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-            .box { min-height: 100px; padding: 15px; }
-            
-            /* Improve table responsiveness */
-            .table-responsive {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            .invoice-table {
-                min-width: 600px;
-            }
-            
-            .invoice-table th,
-            .invoice-table td {
-                white-space: nowrap;
-                padding: 8px 10px;
-                font-size: 12px;
-            }
-        }
-        /* Responsive Invoice Table */
-        .desktop-only { display: block; }
-        .mobile-only { display: none; }
-        .table-responsive { overflow-x: auto; }
-        .invoice-card-mobile { 
-            border: 1px solid #e5e7eb; 
-            border-radius: 6px; 
-            margin-bottom: 15px; 
-            overflow: hidden; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .invoice-card-header { 
-            background: #f9fafb; 
-            padding: 12px 15px; 
-            border-bottom: 1px solid #e5e7eb; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-        }
-        .invoice-period { 
-            font-weight: 600; 
-            color: #1f2937; 
-        }
-        .invoice-card-body { 
-            padding: 15px; 
-        }
-        .invoice-row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 8px; 
-        }
-        .invoice-row:last-child { 
-            margin-bottom: 0; 
-        }
-        .invoice-label { 
-            color: #6b7280; 
-        }
-        .invoice-value { 
-            font-weight: 500; 
-            text-align: right; 
-        }
-        .invoice-card-footer { 
-            padding: 15px; 
-            border-top: 1px solid #e5e7eb; 
-            background: #f9fafb; 
-        }
-        @media (max-width: 768px) {
-            .desktop-only { display: none; }
-            .mobile-only { display: block; }
-        }
-        
-        /* Additional mobile improvements */
-        @media (max-width: 480px) {
-            .invoice-card-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
-            }
-            
-            .invoice-row {
-                flex-direction: column;
-                gap: 4px;
-            }
-            
-            .invoice-label, .invoice-value {
-                text-align: left;
-            }
-            
-            .invoice-value {
-                font-weight: 600;
-            }
-            
-            .card-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-            
-            .summary-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-            
-            .box {
-                min-height: 90px;
-                padding: 12px;
-            }
-            
-            .box h2 {
-                font-size: 20px;
-            }
-            
-            .box p {
-                font-size: 12px;
-            }
+            .summary-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -713,25 +598,26 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
             <h3><i class="fa fa-file-text-o"></i> Riwayat Tagihan</h3>
         </div>
         <div class="card-body">
-            <?php if (empty($invoices)): ?>
-                <div class="alert alert-info" style="text-align:center;">
-                    <i class="fa fa-info-circle"></i> Belum ada invoice yang tercatat.
-                </div>
-            <?php else: ?>
-                <!-- Desktop Table View -->
-                <div class="table-responsive desktop-only">
-                    <table class="invoice-table">
-                        <thead>
+            <div class="table-responsive">
+                <table class="invoice-table">
+                    <thead>
+                        <tr>
+                            <th>Periode</th>
+                            <th>Nominal</th>
+                            <th>Jatuh Tempo</th>
+                            <th>Status</th>
+                            <th>Dibayar</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($invoices)): ?>
                             <tr>
-                                <th>Periode</th>
-                                <th>Nominal</th>
-                                <th>Jatuh Tempo</th>
-                                <th>Status</th>
-                                <th>Dibayar</th>
-                                <th>Aksi</th>
+                                <td colspan="6" style="text-align:center; padding: 20px; color:#6b7280;">
+                                    Belum ada invoice yang tercatat.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
+                        <?php else: ?>
                             <?php foreach ($invoices as $invoice): ?>
                                 <?php $status = strtolower($invoice['status'] ?? 'unpaid'); ?>
                                 <tr>
@@ -754,47 +640,10 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Mobile Card View -->
-                <div class="mobile-only">
-                    <?php foreach ($invoices as $invoice): ?>
-                        <?php $status = strtolower($invoice['status'] ?? 'unpaid'); ?>
-                        <div class="invoice-card-mobile">
-                            <div class="invoice-card-header">
-                                <div class="invoice-period"><?= htmlspecialchars($invoice['period']); ?></div>
-                                <span class="badge-status <?= $status; ?>"><?= ucfirst($status); ?></span>
-                            </div>
-                            <div class="invoice-card-body">
-                                <div class="invoice-row">
-                                    <span class="invoice-label">Nominal:</span>
-                                    <span class="invoice-value">Rp <?= number_format($invoice['amount'], 0, ',', '.'); ?></span>
-                                </div>
-                                <div class="invoice-row">
-                                    <span class="invoice-label">Jatuh Tempo:</span>
-                                    <span class="invoice-value"><?= date('d M Y', strtotime($invoice['due_date'])); ?></span>
-                                </div>
-                                <div class="invoice-row">
-                                    <span class="invoice-label">Dibayar:</span>
-                                    <span class="invoice-value"><?= $invoice['paid_at'] ? date('d M Y H:i', strtotime($invoice['paid_at'])) : '-'; ?></span>
-                                </div>
-                            </div>
-                            <?php if (in_array($status, ['unpaid', 'overdue'])): ?>
-                            <div class="invoice-card-footer">
-                                <form method="post" style="width: 100%;">
-                                    <input type="hidden" name="invoice_id" value="<?= (int)$invoice['id']; ?>">
-                                    <button type="submit" name="pay_invoice" class="btn btn-success" style="width: 100%;">
-                                        <i class="fa fa-credit-card"></i> Bayar Sekarang
-                                    </button>
-                                </form>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

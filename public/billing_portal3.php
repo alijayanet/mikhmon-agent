@@ -127,25 +127,18 @@ try {
             
             // Normalize phone
             $phone = $customer['phone'] ?? '';
-            $wifiDebug[] = "Customer phone: $phone";
-            
-            $normalizedPhone = $phone;
-            if (substr($phone, 0, 2) === '62') {
-                $normalizedPhone = '0' . substr($phone, 2);
-            }
-            $wifiDebug[] = "Normalized phone: $normalizedPhone";
-            
-            // Query device by phone tag WITHOUT projection to get all data including VirtualParameters
-            $query = ['_tags' => $normalizedPhone];
-            $devicesResult = $genieacs->getDevices($query); // No projection - get all data
-            $wifiDebug[] = "Query without projection to get VirtualParameters";
-            
-            $wifiDebug[] = "Device query success: " . ($devicesResult['success'] ? 'YES' : 'NO');
-            $wifiDebug[] = "Devices found: " . count($devicesResult['data'] ?? []);
-            
-            if ($devicesResult['success'] && !empty($devicesResult['data'])) {
-                $device = $devicesResult['data'][0];
-                $wifiDebug[] = "Device ID: " . ($device['_id'] ?? 'N/A');
+            // Resolve Device ID using multi-strategy lookup (PPPoE -> Phone -> Service Number)
+            try {
+                $deviceId = $billingService->resolveGenieAcsDeviceId($genieacs, $customer);
+                $wifiDebug[] = "Resolved Device ID: $deviceId";
+                
+                // Get device details
+                $deviceResult = $genieacs->getDevice($deviceId);
+                $wifiDebug[] = "Device query success: " . ($deviceResult['success'] ? 'YES' : 'NO');
+                
+                if ($deviceResult['success'] && !empty($deviceResult['data'])) {
+                    $device = $deviceResult['data'];
+                    $wifiDebug[] = "Device data retrieved";
                 
                 // Use VirtualParameters like admin page does
                 $ssidPath = 'VirtualParameters.SSID';
@@ -220,10 +213,13 @@ try {
                 ];
                 $wifiDebug[] = "ONU data populated from GenieACS";
             } else {
-                $wifiDebug[] = "No device found with tag: $normalizedPhone";
-                // Set empty deviceSnapshot if no device found
+                $wifiDebug[] = "Device found but returned empty data";
                 $deviceSnapshot = [];
             }
+        } catch (Exception $lookupError) {
+             $wifiDebug[] = "Device lookup failed: " . $lookupError->getMessage();
+             $deviceSnapshot = [];
+        }
         } else {
             $wifiDebug[] = "GenieACS is DISABLED";
         }
@@ -277,26 +273,11 @@ try {
                         throw new Exception('GenieACS tidak aktif.');
                     }
                     
-                    // Normalize phone: 62xxx -> 0xxx
-                    $phone = $customer['phone'] ?? '';
-                    $normalizedPhone = $phone;
-                    if (substr($phone, 0, 2) === '62') {
-                        $normalizedPhone = '0' . substr($phone, 2);
-                    }
-                    
-                    // Query device by phone tag
-                    $query = ['_tags' => $normalizedPhone];
-                    $devicesResult = $genieacs->getDevices($query);
-                    
-                    if (!$devicesResult['success'] || empty($devicesResult['data'])) {
-                        throw new Exception('Device tidak ditemukan. Pastikan nomor HP terdaftar di GenieACS.');
-                    }
-                    
-                    $device = $devicesResult['data'][0];
-                    $deviceId = $device['_id'] ?? '';
-                    
-                    if (empty($deviceId)) {
-                        throw new Exception('Device ID tidak valid.');
+                    // Resolve Device ID using multi-strategy lookup
+                    try {
+                        $deviceId = $billingService->resolveGenieAcsDeviceId($genieacs, $customer);
+                    } catch (Exception $lookupError) {
+                        throw new Exception('Device tidak ditemukan: ' . $lookupError->getMessage());
                     }
                     
                     // Change SSID
@@ -327,26 +308,11 @@ try {
                         throw new Exception('GenieACS tidak aktif.');
                     }
                     
-                    // Normalize phone: 62xxx -> 0xxx
-                    $phone = $customer['phone'] ?? '';
-                    $normalizedPhone = $phone;
-                    if (substr($phone, 0, 2) === '62') {
-                        $normalizedPhone = '0' . substr($phone, 2);
-                    }
-                    
-                    // Query device by phone tag
-                    $query = ['_tags' => $normalizedPhone];
-                    $devicesResult = $genieacs->getDevices($query);
-                    
-                    if (!$devicesResult['success'] || empty($devicesResult['data'])) {
-                        throw new Exception('Device tidak ditemukan. Pastikan nomor HP terdaftar di GenieACS.');
-                    }
-                    
-                    $device = $devicesResult['data'][0];
-                    $deviceId = $device['_id'] ?? '';
-                    
-                    if (empty($deviceId)) {
-                        throw new Exception('Device ID tidak valid.');
+                    // Resolve Device ID using multi-strategy lookup
+                    try {
+                        $deviceId = $billingService->resolveGenieAcsDeviceId($genieacs, $customer);
+                    } catch (Exception $lookupError) {
+                        throw new Exception('Device tidak ditemukan: ' . $lookupError->getMessage());
                     }
                     
                     // Change password
@@ -484,121 +450,7 @@ if (file_exists(__DIR__ . '/../include/theme.php')) {
         }
         @media (max-width: 768px) {
             .wrapper { padding: 10px; }
-            .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-            .box { min-height: 100px; padding: 15px; }
-            
-            /* Improve table responsiveness */
-            .table-responsive {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            .invoice-table {
-                min-width: 600px;
-            }
-            
-            .invoice-table th,
-            .invoice-table td {
-                white-space: nowrap;
-                padding: 8px 10px;
-                font-size: 12px;
-            }
-        }
-        /* Responsive Invoice Table */
-        .desktop-only { display: block; }
-        .mobile-only { display: none; }
-        .table-responsive { overflow-x: auto; }
-        .invoice-card-mobile { 
-            border: 1px solid #e5e7eb; 
-            border-radius: 6px; 
-            margin-bottom: 15px; 
-            overflow: hidden; 
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .invoice-card-header { 
-            background: #f9fafb; 
-            padding: 12px 15px; 
-            border-bottom: 1px solid #e5e7eb; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-        }
-        .invoice-period { 
-            font-weight: 600; 
-            color: #1f2937; 
-        }
-        .invoice-card-body { 
-            padding: 15px; 
-        }
-        .invoice-row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 8px; 
-        }
-        .invoice-row:last-child { 
-            margin-bottom: 0; 
-        }
-        .invoice-label { 
-            color: #6b7280; 
-        }
-        .invoice-value { 
-            font-weight: 500; 
-            text-align: right; 
-        }
-        .invoice-card-footer { 
-            padding: 15px; 
-            border-top: 1px solid #e5e7eb; 
-            background: #f9fafb; 
-        }
-        @media (max-width: 768px) {
-            .desktop-only { display: none; }
-            .mobile-only { display: block; }
-        }
-        
-        /* Additional mobile improvements */
-        @media (max-width: 480px) {
-            .invoice-card-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
-            }
-            
-            .invoice-row {
-                flex-direction: column;
-                gap: 4px;
-            }
-            
-            .invoice-label, .invoice-value {
-                text-align: left;
-            }
-            
-            .invoice-value {
-                font-weight: 600;
-            }
-            
-            .card-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-            
-            .summary-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-            
-            .box {
-                min-height: 90px;
-                padding: 12px;
-            }
-            
-            .box h2 {
-                font-size: 20px;
-            }
-            
-            .box p {
-                font-size: 12px;
-            }
+            .summary-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
