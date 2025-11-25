@@ -191,12 +191,15 @@ CREATE TABLE IF NOT EXISTS digiflazz_transactions (
 -- Pengaturan sistem agent
 CREATE TABLE IF NOT EXISTS agent_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    agent_id INT NOT NULL DEFAULT 1,
     setting_key VARCHAR(100) UNIQUE NOT NULL,
     setting_value TEXT,
     setting_type VARCHAR(20) DEFAULT 'string',
     description TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by VARCHAR(50)
+    updated_by VARCHAR(50),
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+    INDEX idx_agent_id (agent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Table: payment_methods
@@ -224,23 +227,23 @@ CREATE TABLE IF NOT EXISTS payment_methods (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Insert default settings
-INSERT INTO agent_settings (setting_key, setting_value, setting_type, description) VALUES
-('min_topup_amount', '50000', 'number', 'Minimum amount untuk topup saldo'),
-('max_topup_amount', '10000000', 'number', 'Maximum amount untuk topup saldo'),
-('auto_approve_topup', '0', 'boolean', 'Auto approve topup request'),
-('commission_enabled', '1', 'boolean', 'Enable commission system'),
-('default_commission_percent', '5', 'number', 'Default commission percentage'),
-('agent_registration_enabled', '1', 'boolean', 'Allow agent self registration'),
-('min_balance_alert', '10000', 'number', 'Alert when balance below this amount'),
-('whatsapp_notification_enabled', '1', 'boolean', 'Send WhatsApp notification to agents'),
-('agent_can_set_sell_price', '1', 'boolean', 'Allow agent to set their own sell price'),
-('voucher_prefix_agent', 'AG', 'string', 'Prefix for agent generated vouchers'),
-('digiflazz_enabled', '0', 'boolean', 'Enable Digiflazz integration'),
-('digiflazz_username', '', 'string', 'Digiflazz buyer username'),
-('digiflazz_api_key', '', 'string', 'Digiflazz API key'),
-('digiflazz_allow_test', '1', 'boolean', 'Allow Digiflazz testing mode'),
-('digiflazz_default_markup_percent', '5', 'number', 'Default markup percent for Digiflazz products'),
-('digiflazz_last_sync', NULL, 'datetime', 'Last price list sync timestamp')
+INSERT INTO agent_settings (agent_id, setting_key, setting_value, setting_type, description) VALUES
+(1, 'min_topup_amount', '50000', 'number', 'Minimum amount untuk topup saldo'),
+(1, 'max_topup_amount', '10000000', 'number', 'Maximum amount untuk topup saldo'),
+(1, 'auto_approve_topup', '0', 'boolean', 'Auto approve topup request'),
+(1, 'commission_enabled', '1', 'boolean', 'Enable commission system'),
+(1, 'default_commission_percent', '5', 'number', 'Default commission percentage'),
+(1, 'agent_registration_enabled', '1', 'boolean', 'Allow agent self registration'),
+(1, 'min_balance_alert', '10000', 'number', 'Alert when balance below this amount'),
+(1, 'whatsapp_notification_enabled', '1', 'boolean', 'Send WhatsApp notification to agents'),
+(1, 'agent_can_set_sell_price', '1', 'boolean', 'Allow agent to set their own sell price'),
+(1, 'voucher_prefix_agent', 'AG', 'string', 'Prefix for agent generated vouchers'),
+(1, 'digiflazz_enabled', '0', 'boolean', 'Enable Digiflazz integration'),
+(1, 'digiflazz_username', '', 'string', 'Digiflazz buyer username'),
+(1, 'digiflazz_api_key', '', 'string', 'Digiflazz API key'),
+(1, 'digiflazz_allow_test', '1', 'boolean', 'Allow Digiflazz testing mode'),
+(1, 'digiflazz_default_markup_percent', '5', 'number', 'Default markup percent for Digiflazz products'),
+(1, 'digiflazz_last_sync', NULL, 'datetime', 'Last price list sync timestamp')
 ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);
 
 -- Insert default payment methods
