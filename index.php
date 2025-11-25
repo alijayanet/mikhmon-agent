@@ -368,11 +368,6 @@ elseif ($removeexpiredhotspotuser != "") {
     include_once('./settings/whatsapp_settings.php');
   }
 
-// whatsapp gateway admin
-  elseif ($hotspot == "whatsapp-gateway") {
-    include_once('./settings/whatsapp_gateway_admin.php');
-  }
-
 // agent management
   elseif ($hotspot == "agent-setup") {
     try {

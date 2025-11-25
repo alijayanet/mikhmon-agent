@@ -1,0 +1,2 @@
+[18-Nov-2025 05:59:50 UTC] Payment Gateway Save Attempt: {"gateway_name":"tripay","is_active":1,"is_sandbox":0,"api_key":"zQOVyIHovY...","merchant_code":"T46967"}
+[18-Nov-2025 05:59:50 UTC] Payment Gateway Save Success: tripay

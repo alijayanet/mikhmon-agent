@@ -745,25 +745,24 @@ require_once __DIR__ . '/include/db_config.php';
                     if (!tableExists($pdo, 'billing_customers')) {
                         logMessage('Creating billing_customers table...', 'info');
                         $pdo->exec("CREATE TABLE `billing_customers` (
-                            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                            `profile_id` INT UNSIGNED NOT NULL,
-                            `name` VARCHAR(150) NOT NULL,
-                            `phone` VARCHAR(32) DEFAULT NULL,
-                            `email` VARCHAR(150) DEFAULT NULL,
+                            `id` INT AUTO_INCREMENT PRIMARY KEY,
+                            `profile_id` INT NOT NULL,
+                            `name` VARCHAR(100) NOT NULL,
+                            `phone` VARCHAR(20),
+                            `email` VARCHAR(100),
                             `address` TEXT,
-                            `service_number` VARCHAR(100) DEFAULT NULL,
-                            `status` ENUM('active','inactive') NOT NULL DEFAULT 'active',
-                            `billing_day` TINYINT UNSIGNED NOT NULL DEFAULT 20,
-                            `auto_isolation` TINYINT(1) NOT NULL DEFAULT 1,
+                            `service_number` VARCHAR(50),
+                            `status` ENUM('active','suspended','terminated') DEFAULT 'active',
+                            `billing_day` INT DEFAULT 1,
                             `last_bill_date` DATE,
                             `next_bill_date` DATE,
-                            `is_isolated` TINYINT(1) NOT NULL DEFAULT 0,
-                            `next_isolation_date` DATE DEFAULT NULL,
-                            `genieacs_match_mode` ENUM('device_id','phone_tag','pppoe_username') NOT NULL DEFAULT 'device_id',
+                            `is_isolated` TINYINT(1) DEFAULT 0,
+                            `next_isolation_date` DATE,
+                            `genieacs_match_mode` ENUM('mac','serial','pppoe') DEFAULT 'mac',
                             `genieacs_pppoe_username` VARCHAR(100),
-                            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-                            KEY `idx_profile_id` (`profile_id`),
+                            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            KEY `idx_status` (`status`),
                             KEY `idx_billing_day` (`billing_day`)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
                         logMessage('✓ Billing customers table created', 'success');
@@ -851,42 +850,22 @@ require_once __DIR__ . '/include/db_config.php';
                     if (!tableExists($pdo, 'billing_settings')) {
                         logMessage('Creating billing_settings table...', 'info');
                         $pdo->exec("CREATE TABLE `billing_settings` (
-                            `setting_key` VARCHAR(100) NOT NULL,
-                            `setting_value` TEXT DEFAULT NULL,
-                            `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                            PRIMARY KEY (`setting_key`)
+                            `setting_key` VARCHAR(50) PRIMARY KEY,
+                            `setting_value` TEXT,
+                            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
                         logMessage('✓ Billing settings table created', 'success');
-                    }
-                    
-                    if (!tableExists($pdo, 'billing_payments')) {
-                        logMessage('Creating billing_payments table...', 'info');
-                        $pdo->exec("CREATE TABLE `billing_payments` (
-                            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                            `invoice_id` BIGINT UNSIGNED NOT NULL,
-                            `amount` DECIMAL(12,2) NOT NULL,
-                            `payment_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            `method` VARCHAR(100) DEFAULT NULL,
-                            `notes` TEXT DEFAULT NULL,
-                            `created_by` INT UNSIGNED DEFAULT NULL,
-                            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            PRIMARY KEY (`id`),
-                            KEY `idx_invoice_id` (`invoice_id`)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-                        logMessage('✓ Billing payments table created', 'success');
                     }
                     
                     if (!tableExists($pdo, 'billing_logs')) {
                         logMessage('Creating billing_logs table...', 'info');
                         $pdo->exec("CREATE TABLE `billing_logs` (
-                            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                            `invoice_id` BIGINT UNSIGNED DEFAULT NULL,
-                            `customer_id` INT UNSIGNED DEFAULT NULL,
-                            `event` VARCHAR(100) NOT NULL,
-                            `metadata` JSON DEFAULT NULL,
-                            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            PRIMARY KEY (`id`),
-                            KEY `idx_invoice_id` (`invoice_id`),
+                            `id` INT AUTO_INCREMENT PRIMARY KEY,
+                            `customer_id` INT,
+                            `action` VARCHAR(50) NOT NULL,
+                            `description` TEXT,
+                            `created_by` VARCHAR(50),
+                            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             KEY `idx_customer_id` (`customer_id`)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
                         logMessage('✓ Billing logs table created', 'success');
@@ -895,18 +874,13 @@ require_once __DIR__ . '/include/db_config.php';
                     if (!tableExists($pdo, 'billing_portal_otps')) {
                         logMessage('Creating billing_portal_otps table...', 'info');
                         $pdo->exec("CREATE TABLE `billing_portal_otps` (
-                            `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                            `customer_id` INT UNSIGNED NOT NULL,
-                            `identifier` VARCHAR(191) NOT NULL,
-                            `otp_code` VARCHAR(191) NOT NULL,
+                            `id` INT AUTO_INCREMENT PRIMARY KEY,
+                            `phone` VARCHAR(20) NOT NULL,
+                            `otp_code` VARCHAR(255) NOT NULL,
+                            `is_used` TINYINT(1) DEFAULT 0,
                             `expires_at` DATETIME NOT NULL,
-                            `attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-                            `max_attempts` TINYINT UNSIGNED NOT NULL DEFAULT 5,
-                            `sent_via` ENUM('whatsapp','sms','email') DEFAULT 'whatsapp',
-                            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                            PRIMARY KEY (`id`),
-                            KEY `idx_customer_id` (`customer_id`),
-                            KEY `idx_identifier` (`identifier`),
+                            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            KEY `idx_phone` (`phone`),
                             KEY `idx_expires_at` (`expires_at`)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
                         logMessage('✓ Billing portal OTPs table created', 'success');
@@ -928,22 +902,10 @@ require_once __DIR__ . '/include/db_config.php';
                             logMessage('✓ Foreign key added to billing_customers', 'success');
                         }
                         
-                        // Add foreign key to billing_payments
-                        if (tableExists($pdo, 'billing_payments') && tableExists($pdo, 'billing_invoices')) {
-                            $pdo->exec("ALTER TABLE `billing_payments` ADD CONSTRAINT `fk_billing_payments_invoice` FOREIGN KEY (`invoice_id`) REFERENCES `billing_invoices` (`id`) ON DELETE CASCADE ON UPDATE CASCADE");
-                            logMessage('✓ Foreign key added to billing_payments', 'success');
-                        }
-                        
                         // Add foreign key to billing_logs
                         if (tableExists($pdo, 'billing_logs') && tableExists($pdo, 'billing_customers')) {
                             $pdo->exec("ALTER TABLE `billing_logs` ADD CONSTRAINT `fk_billing_logs_customer` FOREIGN KEY (`customer_id`) REFERENCES `billing_customers` (`id`) ON DELETE SET NULL ON UPDATE CASCADE");
                             logMessage('✓ Foreign key added to billing_logs', 'success');
-                        }
-                        
-                        // Add foreign key to billing_logs for invoice_id
-                        if (tableExists($pdo, 'billing_logs') && tableExists($pdo, 'billing_invoices')) {
-                            $pdo->exec("ALTER TABLE `billing_logs` ADD CONSTRAINT `fk_billing_logs_invoice` FOREIGN KEY (`invoice_id`) REFERENCES `billing_invoices` (`id`) ON DELETE SET NULL ON UPDATE CASCADE");
-                            logMessage('✓ Foreign key added to billing_logs for invoice_id', 'success');
                         }
                         
                     } catch (Exception $e) {

@@ -443,6 +443,40 @@ if (!columnExists($pdo, 'agent_settings', 'agent_id')) {
     logMessage('Kolom agent_settings.agent_id ditambahkan', 'ok');
 }
 
+// Memastikan kolom setting_type dan description ada
+ensureColumn($pdo, 'agent_settings', 'setting_type', "VARCHAR(20) DEFAULT 'string'", 'setting_value');
+ensureColumn($pdo, 'agent_settings', 'description', 'TEXT', 'setting_type');
+ensureColumn($pdo, 'agent_settings', 'updated_by', 'VARCHAR(50)', 'updated_at');
+
+// Menambahkan index untuk agent_id jika belum ada
+if (!indexExists($pdo, 'agent_settings', 'idx_agent_id')) {
+    logMessage('Menambahkan index untuk agent_settings.agent_id ...', 'warn');
+    $pdo->exec("ALTER TABLE `agent_settings` ADD INDEX `idx_agent_id` (`agent_id`)");
+    logMessage('Index agent_settings.agent_id ditambahkan', 'ok');
+}
+
+// Memastikan foreign key untuk agent_id
+$foreignKeyExists = false;
+try {
+    $fkCheck = $pdo->query("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'agent_settings' 
+        AND COLUMN_NAME = 'agent_id' 
+        AND REFERENCED_TABLE_NAME = 'agents'");
+    $foreignKeyExists = (bool)$fkCheck->fetch();
+} catch (Exception $e) {
+    // Abaikan error
+}
+
+if (!$foreignKeyExists) {
+    logMessage('Memastikan foreign key untuk agent_settings.agent_id ...', 'warn');
+    // Hapus constraint lama jika ada
+    $pdo->exec("ALTER TABLE `agent_settings` DROP FOREIGN KEY IF EXISTS `fk_agent_settings_agent`");
+    // Tambahkan constraint baru
+    $pdo->exec("ALTER TABLE `agent_settings` ADD CONSTRAINT `fk_agent_settings_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents`(`id`) ON DELETE CASCADE");
+    logMessage('Foreign key agent_settings.agent_id diperbarui', 'ok');
+}
+
 /**
  * 2. Seed data minimal untuk Agent/Public Sales
  */
@@ -472,15 +506,31 @@ $defaultAgentSettings = [
     ['agent_id' => $agentDemoId, 'key' => 'digiflazz_api_key', 'value' => ''],
     ['agent_id' => $agentDemoId, 'key' => 'digiflazz_is_production', 'value' => '0'],
     ['agent_id' => $agentDemoId, 'key' => 'default_markup_nominal', 'value' => '300'],
+    // Voucher settings
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_username_password_same', 'value' => '0', 'type' => 'boolean', 'description' => 'Username dan password sama atau berbeda'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_username_type', 'value' => 'alphanumeric', 'type' => 'string', 'description' => 'Tipe karakter username: numeric, alpha, alphanumeric'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_username_length', 'value' => '8', 'type' => 'number', 'description' => 'Panjang karakter username'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_password_type', 'value' => 'alphanumeric', 'type' => 'string', 'description' => 'Tipe karakter password: numeric, alpha, alphanumeric'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_password_length', 'value' => '6', 'type' => 'number', 'description' => 'Panjang karakter password'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_prefix_enabled', 'value' => '1', 'type' => 'boolean', 'description' => 'Gunakan prefix untuk username'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_prefix', 'value' => 'AG', 'type' => 'string', 'description' => 'Prefix untuk username'],
+    ['agent_id' => $agentDemoId, 'key' => 'voucher_uppercase', 'value' => '1', 'type' => 'boolean', 'description' => 'Gunakan huruf kapital'],
+    // Payment information
+    ['agent_id' => $agentDemoId, 'key' => 'payment_bank_name', 'value' => 'BCA', 'type' => 'string', 'description' => 'Nama Bank'],
+    ['agent_id' => $agentDemoId, 'key' => 'payment_account_number', 'value' => '1234567890', 'type' => 'string', 'description' => 'Nomor Rekening'],
+    ['agent_id' => $agentDemoId, 'key' => 'payment_account_name', 'value' => 'Nama Pemilik', 'type' => 'string', 'description' => 'Nama Pemilik Rekening'],
+    ['agent_id' => $agentDemoId, 'key' => 'payment_wa_confirm', 'value' => '08123456789', 'type' => 'string', 'description' => 'Nomor WhatsApp Konfirmasi'],
 ];
 
-$settingStmt = $pdo->prepare("INSERT INTO agent_settings (agent_id, setting_key, setting_value) VALUES (:agent, :key, :value)
-    ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+$settingStmt = $pdo->prepare("INSERT INTO agent_settings (agent_id, setting_key, setting_value, setting_type, description) VALUES (:agent, :key, :value, :type, :description)
+    ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), setting_type = VALUES(setting_type), description = VALUES(description)");
 foreach ($defaultAgentSettings as $row) {
     $settingStmt->execute([
         ':agent' => $row['agent_id'],
         ':key' => $row['key'],
         ':value' => $row['value'],
+        ':type' => $row['type'] ?? 'string',
+        ':description' => $row['description'] ?? ''
     ]);
 }
 logMessage('Agent settings baseline diperbarui', 'ok');
@@ -654,6 +704,7 @@ CREATE TABLE `billing_customers` (
   `status` ENUM('active','inactive') NOT NULL DEFAULT 'active',
   `is_isolated` TINYINT(1) NOT NULL DEFAULT 0,
   `next_isolation_date` DATE DEFAULT NULL,
+  `auto_isolation` TINYINT(1) NOT NULL DEFAULT 1,
   `genieacs_match_mode` ENUM('device_id','phone_tag','pppoe_username') NOT NULL DEFAULT 'device_id',
   `genieacs_pppoe_username` VARCHAR(191) DEFAULT NULL,
   `notes` TEXT DEFAULT NULL,
@@ -751,6 +802,9 @@ ensureColumn($pdo, 'billing_invoices', 'paid_via', 'VARCHAR(50) DEFAULT NULL', '
 ensureColumn($pdo, 'billing_invoices', 'paid_via_agent_id', 'INT UNSIGNED DEFAULT NULL', 'paid_via');
 ensureColumn($pdo, 'billing_invoices', 'whatsapp_sent_at', 'DATETIME DEFAULT NULL', 'reference_number');
 ensureIndex($pdo, 'billing_invoices', 'uniq_customer_period', 'UNIQUE KEY `uniq_customer_period` (`customer_id`,`period`)');
+
+// Tambahkan kolom auto_isolation ke billing_customers
+ensureColumn($pdo, 'billing_customers', 'auto_isolation', 'TINYINT(1) NOT NULL DEFAULT 1', 'next_isolation_date');
 
 // Pastikan billing_logs table referensinya tersedia
 ensureIndex($pdo, 'billing_logs', 'idx_invoice_id', 'KEY `idx_invoice_id` (`invoice_id`)');

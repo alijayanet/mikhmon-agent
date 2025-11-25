@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Agent System Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .status.loading {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin: 10px 10px 10px 0;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-success {
+            background: #10b981;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .info {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .step h3 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔍 Check Agent System Status</h1>
+        <p style="color: #666;">Cek apakah database agent system sudah terinstall</p>
+        
+        <div class="status loading" id="status">
+            ⏳ Checking database status...
+        </div>
+        
+        <div id="result"></div>
+        
+        <div id="actions" style="display:none;">
+            <h3>Langkah Selanjutnya:</h3>
+        </div>
+    </div>
+
+    <div class="card" id="instructions" style="display:none;">
+        <h2>📋 Cara Install Database Agent</h2>
+        
+        <div class="step">
+            <h3>Opsi 1: Via Web Installer (Mudah)</h3>
+            <p>1. Klik tombol di bawah untuk membuka installer</p>
+            <p>2. Isi form database (biasanya default sudah benar)</p>
+            <p>3. Klik "Install Agent System"</p>
+            <p>4. Tunggu sampai selesai</p>
+            <a href="install_agent_system.php" class="btn btn-success" target="_blank">
+                🚀 Buka Installer
+            </a>
+        </div>
+
+        <div class="step">
+            <h3>Opsi 2: Via MikhMon Admin</h3>
+            <p>1. Login ke MikhMon admin</p>
+            <p>2. Klik menu "Agent Management"</p>
+            <p>3. Klik "Agent Setup"</p>
+            <p>4. Klik "Install Agent System"</p>
+        </div>
+
+        <div class="step">
+            <h3>Opsi 3: Via phpMyAdmin (Manual)</h3>
+            <p>1. Buka phpMyAdmin: <a href="http://localhost/phpmyadmin" target="_blank">http://localhost/phpmyadmin</a></p>
+            <p>2. Buat database baru: <code>mikhmon_agents</code></p>
+            <p>3. Import file: <code>mikhmon/database/agent_system.sql</code></p>
+            <p>4. Pastikan 3 table terbuat: agents, agent_prices, agent_transactions</p>
+        </div>
+
+        <div class="info">
+            <strong>💡 Tips:</strong> Setelah install database, refresh halaman ini untuk cek status lagi.
+        </div>
+    </div>
+
+    <script>
+        // Check database status via AJAX
+        fetch('test_agent_db.php')
+            .then(response => response.text())
+            .then(html => {
+                const statusDiv = document.getElementById('status');
+                const resultDiv = document.getElementById('result');
+                const actionsDiv = document.getElementById('actions');
+                const instructionsDiv = document.getElementById('instructions');
+                
+                // Check if all tests passed
+                const hasError = html.includes('✗') || html.includes('NOT FOUND') || html.includes('failed');
+                const allPassed = html.includes('All tests completed') && !hasError;
+                
+                if (allPassed) {
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = '✅ Database Agent System Sudah Terinstall!';
+                    
+                    actionsDiv.style.display = 'block';
+                    actionsDiv.innerHTML = `
+                        <h3>✅ Langkah Selanjutnya:</h3>
+                        <a href="admin.php" class="btn">🔐 Login MikhMon Admin</a>
+                        <a href="agent/" class="btn btn-success">👤 Agent Login Panel</a>
+                        <div class="info" style="margin-top: 20px;">
+                            <strong>Database sudah siap!</strong><br>
+                            Sekarang Anda bisa:
+                            <ul>
+                                <li>Login ke MikhMon admin</li>
+                                <li>Klik menu "Agent Management"</li>
+                                <li>Tambah agent baru</li>
+                                <li>Set harga per profile</li>
+                                <li>Mulai generate voucher</li>
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = '❌ Database Agent System Belum Terinstall';
+                    
+                    instructionsDiv.style.display = 'block';
+                    
+                    actionsDiv.style.display = 'block';
+                    actionsDiv.innerHTML = `
+                        <h3>⚠️ Database Belum Terinstall</h3>
+                        <p>Silakan install database terlebih dahulu menggunakan salah satu cara di bawah:</p>
+                        <a href="install_agent_system.php" class="btn btn-success">🚀 Install Database Sekarang</a>
+                        <a href="http://localhost/phpmyadmin" class="btn" target="_blank">📊 Buka phpMyAdmin</a>
+                    `;
+                }
+                
+                // Show detailed result
+                resultDiv.innerHTML = '<details><summary style="cursor:pointer;padding:10px;background:#f8f9fa;border-radius:5px;margin:10px 0;"><strong>📝 Detail Test Result (klik untuk expand)</strong></summary><pre>' + html.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></details>';
+            })
+            .catch(error => {
+                const statusDiv = document.getElementById('status');
+                const actionsDiv = document.getElementById('actions');
+                const instructionsDiv = document.getElementById('instructions');
+                
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '❌ Error: Tidak bisa mengecek database';
+                
+                actionsDiv.style.display = 'block';
+                actionsDiv.innerHTML = `
+                    <h3>⚠️ Error Checking Database</h3>
+                    <p>Error: ${error.message}</p>
+                    <p>Kemungkinan:</p>
+                    <ul>
+                        <li>Apache/MySQL belum running</li>
+                        <li>File test_agent_db.php tidak ada</li>
+                        <li>PHP error</li>
+                    </ul>
+                    <a href="install_agent_system.php" class="btn btn-success">🚀 Coba Install Database</a>
+                `;
+                
+                instructionsDiv.style.display = 'block';
+            });
+    </script>
+</body>
+</html>

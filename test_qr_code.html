@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .qr-test {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .qr-test img {
+            width: 200px;
+            height: 200px;
+            border: 3px solid #667eea;
+            border-radius: 8px;
+            padding: 8px;
+            background: white;
+        }
+        .qr-test h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔍 QR Code Test</h1>
+        
+        <div class="info">
+            <strong>Test Purpose:</strong> Verify QR code generation and display
+        </div>
+
+        <!-- Test 1: Google Charts API -->
+        <div class="qr-test">
+            <h3>Test 1: Google Charts API</h3>
+            <img src="https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=http://10.5.50.1/login?username=TEST123&password=PASS456&choe=UTF-8" 
+                 alt="QR Code Test 1"
+                 onerror="this.parentElement.innerHTML += '<p style=color:red>Failed to load</p>'">
+            <p>URL: http://10.5.50.1/login?username=TEST123&password=PASS456</p>
+        </div>
+
+        <!-- Test 2: QR Server API -->
+        <div class="qr-test">
+            <h3>Test 2: QR Server API</h3>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://10.5.50.1/login?username=TEST123&password=PASS456" 
+                 alt="QR Code Test 2"
+                 onerror="this.parentElement.innerHTML += '<p style=color:red>Failed to load</p>'">
+            <p>URL: http://10.5.50.1/login?username=TEST123&password=PASS456</p>
+        </div>
+
+        <!-- Test 3: With encodeURIComponent -->
+        <div class="qr-test">
+            <h3>Test 3: Encoded URL</h3>
+            <img id="qr3" alt="QR Code Test 3">
+            <p id="url3"></p>
+            <script>
+                const loginUrl = 'http://10.5.50.1/login?username=TEST123&password=PASS456';
+                const qrUrl = 'https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=' + encodeURIComponent(loginUrl) + '&choe=UTF-8';
+                document.getElementById('qr3').src = qrUrl;
+                document.getElementById('url3').textContent = 'QR URL: ' + qrUrl;
+            </script>
+        </div>
+
+        <div class="info">
+            <strong>Expected Result:</strong> All 3 QR codes should display correctly.<br>
+            <strong>If not displaying:</strong> Check browser console for errors.
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 5px;">
+            <strong>Debug Info:</strong><br>
+            User Agent: <span id="ua"></span><br>
+            Online: <span id="online"></span><br>
+            <script>
+                document.getElementById('ua').textContent = navigator.userAgent;
+                document.getElementById('online').textContent = navigator.onLine ? 'Yes' : 'No';
+            </script>
+        </div>
+    </div>
+</body>
+</html>
