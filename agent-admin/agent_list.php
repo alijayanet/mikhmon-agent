@@ -175,6 +175,11 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
                             <i class="fa fa-check"></i>
                         </a>
                         <?php endif; ?>
+                        <a href="?hotspot=agent-list&action=delete&agent_id=<?= $agt['id']; ?>&session=<?= $session; ?>" 
+                           class="btn btn-sm btn-danger" title="Hapus"
+                           onclick="return confirm('⚠️ PERINGATAN!\n\nApakah Anda yakin ingin menghapus agent ini?\n\nAgent: <?= htmlspecialchars($agt['agent_name']); ?>\nKode: <?= htmlspecialchars($agt['agent_code']); ?>\n\nData yang akan dihapus:\n- Semua transaksi agent\n- Semua pricing agent\n- Semua penjualan public\n\nTindakan ini TIDAK DAPAT DIBATALKAN!')">
+                            <i class="fa fa-trash"></i>
+                        </a>
                     </td>
                 </tr>
                 <?php endforeach; ?>
