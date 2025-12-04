@@ -247,13 +247,6 @@ function processCommand($phone, $message) {
     // Example: VOUCHER 3K, VOUCHER 1JAM, VOUCHER 3K 08123456789
     // Example with manual username: VOUCHER user123 3K, VOUCHER user123 3K 08123456789
     if (strpos($messageLower, 'voucher ') === 0) {
-        // Check authorization (admin or agent only)
-        $auth = isAuthorizedForCommands($phone);
-        if (!$auth['authorized']) {
-            // Unauthorized - ignore command (no response)
-            return;
-        }
-        
         $rest = trim(str_replace('voucher ', '', $messageLower));
         // Parse: bisa "3K", "3K 08123456789", "user123 3K", atau "user123 3K 08123456789"
         $parts = preg_split('/\s+/', $rest);
@@ -292,13 +285,6 @@ function processCommand($phone, $message) {
     // Command: VCR [USERNAME] <PROFILE> [NOMER] - Alias untuk VOUCHER
     // Example: VCR 3K, VCR user123 3K 08123456789
     elseif (strpos($messageLower, 'vcr ') === 0) {
-        // Check authorization (admin or agent only)
-        $auth = isAuthorizedForCommands($phone);
-        if (!$auth['authorized']) {
-            // Unauthorized - ignore command (no response)
-            return;
-        }
-        
         $rest = trim(str_replace('vcr ', '', $messageLower));
         $parts = preg_split('/\s+/', $rest);
         
@@ -330,13 +316,6 @@ function processCommand($phone, $message) {
     // Command: GENERATE [USERNAME] <PROFILE> [NOMER] - Alias untuk VOUCHER
     // Example: GENERATE 3K, GENERATE user123 3K 08123456789
     elseif (strpos($messageLower, 'generate ') === 0) {
-        // Check authorization (admin or agent only)
-        $auth = isAuthorizedForCommands($phone);
-        if (!$auth['authorized']) {
-            // Unauthorized - ignore command (no response)
-            return;
-        }
-        
         $rest = trim(str_replace('generate ', '', $messageLower));
         $parts = preg_split('/\s+/', $rest);
         
@@ -368,13 +347,6 @@ function processCommand($phone, $message) {
     // Command: MEMBER <PROFILE> - Username dan Password BEDA
     // Example: MEMBER 3K, MEMBER 1JAM
     elseif (strpos($messageLower, 'member ') === 0) {
-        // Check authorization (admin or agent only)
-        $auth = isAuthorizedForCommands($phone);
-        if (!$auth['authorized']) {
-            // Unauthorized - ignore command (no response)
-            return;
-        }
-        
         $profile = trim(str_replace('member ', '', $messageLower));
         if (!empty($profile)) {
             purchaseVoucher($phone, $profile, 'member'); // Mode: username ≠ password
@@ -384,13 +356,6 @@ function processCommand($phone, $message) {
     // Command: BELI <PROFILE> - Default (menggunakan setting voucher)
     // Example: BELI 1JAM, BELI 3JAM, BELI 1HARI
     elseif (strpos($messageLower, 'beli ') === 0) {
-        // Check authorization (admin or agent only)
-        $auth = isAuthorizedForCommands($phone);
-        if (!$auth['authorized']) {
-            // Unauthorized - ignore command (no response)
-            return;
-        }
-        
         $profile = trim(str_replace('beli ', '', $messageLower));
         if (!empty($profile)) {
             purchaseVoucher($phone, $profile, 'default'); // Mode: default dari settings
@@ -410,13 +375,6 @@ function processCommand($phone, $message) {
     // Command: PULSA <SKU> <NOMER> - Beli produk Digiflazz (pulsa, data, e-money, games)
     // Example: PULSA as10 081234567890, PULSA xl5 087828060222
     elseif (strpos($messageLower, 'pulsa ') === 0) {
-        // Check authorization (admin or agent only)
-        $auth = isAuthorizedForCommands($phone);
-        if (!$auth['authorized']) {
-            // Unauthorized - ignore command (no response)
-            return;
-        }
-        
         $rest = trim(str_replace('pulsa ', '', $messageLower));
         $parts = preg_split('/\s+/', $rest, 2);
         
@@ -695,25 +653,6 @@ function isAdminNumber($phone) {
 }
 
 /**
- * Check if user is authorized for commands (admin or active agent)
- * Returns array with authorization status, role, and agent data
- */
-function isAuthorizedForCommands($phone) {
-    // Check if admin
-    if (isAdminNumber($phone)) {
-        return ['authorized' => true, 'role' => 'admin', 'agent' => null];
-    }
-    
-    // Check if agent
-    $agent = getAgentByPhone($phone);
-    if ($agent && $agent['status'] === 'active') {
-        return ['authorized' => true, 'role' => 'agent', 'agent' => $agent];
-    }
-    
-    return ['authorized' => false, 'role' => null, 'agent' => null];
-}
-
-/**
  * Purchase voucher
  * @param string $phone Nomor WhatsApp (agent/admin)
  * @param string $profileName Nama profile MikroTik
@@ -740,25 +679,6 @@ function purchaseVoucher($phone, $profileName, $mode = 'default', $customerPhone
     
     // Check if admin
     $isAdmin = isAdminNumber($phone);
-    
-    // Check if agent (only for non-admin users)
-    if (!$isAdmin) {
-        // Load Agent class
-        if (!class_exists('Agent')) {
-            require_once('../lib/Agent.class.php');
-        }
-        
-        $agent = getAgentByPhone($phone);
-        if (!$agent) {
-            sendWhatsAppMessage($phone, "❌ *AKSES DITOLAK*\n\nFitur ini hanya untuk Admin & Agent.\n\nHubungi administrator untuk registrasi agent.");
-            return;
-        }
-        
-        if ($agent['status'] !== 'active') {
-            sendWhatsAppMessage($phone, "❌ *AKUN TIDAK AKTIF*\n\nAkun agent Anda tidak aktif.\nHubungi administrator.");
-            return;
-        }
-    }
     
     // Get first session (you can modify this to use specific session)
     $sessions = array_keys($data);
@@ -927,30 +847,49 @@ function purchaseVoucher($phone, $profileName, $mode = 'default', $customerPhone
     $price = explode(",", $ponlogin)[2];
     $sprice = explode(",", $ponlogin)[4];
     
-    // Check if agent (non-admin) and check balance
+    // Check agent balance (only for non-admin)
+    $buyPrice = (float)$sprice;
+    $agent = null;
+    $agentId = null;
+    $balanceBefore = 0;
+    $balanceAfter = 0;
+    
     if (!$isAdmin) {
-        // Get agent price
-        $agentClass = new Agent();
-        $priceData = $agentClass->getAgentPrice($agent['id'], $profileName);
-        
-        if (!$priceData) {
-            $API->disconnect();
-            sendWhatsAppMessage($phone, "❌ Harga untuk profile *$profileName* belum diset.\nHubungi admin.");
-            return;
-        }
-        
-        $buyPrice = $priceData['buy_price'];
-        
-        // Check balance
-        if ($agent['balance'] < $buyPrice) {
-            $reply = "❌ *SALDO TIDAK CUKUP*\n\n";
-            $reply .= "Saldo Anda: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n";
-            $reply .= "Dibutuhkan: Rp " . number_format($buyPrice, 0, ',', '.') . "\n";
-            $reply .= "Kurang: Rp " . number_format($buyPrice - $agent['balance'], 0, ',', '.') . "\n\n";
-            $reply .= "Silakan topup saldo terlebih dahulu.";
-            $API->disconnect();
-            sendWhatsAppMessage($phone, $reply);
-            return;
+        // Get agent info (using existing getAgentByPhone function)
+        if (function_exists('getAgentByPhone')) {
+            $agent = getAgentByPhone($phone);
+            
+            if ($agent) {
+                $agentId = $agent['id'];
+                
+                // Validate price
+                if ($buyPrice <= 0) {
+                    $API->disconnect();
+                    sendWhatsAppMessage($phone, "❌ *HARGA TIDAK VALID*\n\nHarga paket *$profileName* belum dikonfigurasi.\nHubungi administrator.");
+                    return;
+                }
+                
+                // Check balance
+                if ($agent['balance'] < $buyPrice) {
+                    $reply = "❌ *SALDO TIDAK CUKUP*\n\n";
+                    $reply .= "Saldo Anda: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n";
+                    $reply .= "Dibutuhkan: Rp " . number_format($buyPrice, 0, ',', '.') . "\n";
+                    $reply .= "Kurang: Rp " . number_format($buyPrice - $agent['balance'], 0, ',', '.') . "\n\n";
+                    $reply .= "Silakan topup saldo terlebih dahulu.";
+                    $API->disconnect();
+                    sendWhatsAppMessage($phone, $reply);
+                    return;
+                }
+            } else {
+                // Not an agent and not an admin - REJECT
+                $API->disconnect();
+                $errorMsg = "❌ *AKSES DITOLAK*\n\n";
+                $errorMsg .= "Nomor Anda tidak terdaftar sebagai agent.\n\n";
+                $errorMsg .= "Untuk menjadi agent, silakan hubungi administrator.";
+                sendWhatsAppMessage($phone, $errorMsg);
+                logWebhookError($phone, "BELI $profileName", "Unauthorized access attempt - not an agent or admin");
+                return;
+            }
         }
     }
     
@@ -1066,49 +1005,28 @@ function purchaseVoucher($phone, $profileName, $mode = 'default', $customerPhone
     $API->disconnect();
     
     // Deduct balance for agent (only for non-admin)
-    $transactionId = null;
-    $balanceBefore = 0;
-    $balanceAfter = 0;
-    
-    if (!$isAdmin) {
-        // Deduct balance
+    if (!$isAdmin && $agent && $agentId) {
+        // Load Agent class if not already loaded
+        if (!class_exists('Agent')) {
+            require_once('../lib/Agent.class.php');
+        }
+        
         $agentClass = new Agent();
         $deductResult = $agentClass->deductBalance(
-            $agent['id'],
+            $agentId,
             $buyPrice,
             $profileName,
             $username,
-            'Generate via WhatsApp'
+            'Voucher WhatsApp: ' . $profileName,
+            'voucher_whatsapp'
         );
         
-        if (!$deductResult['success']) {
-            sendWhatsAppMessage($phone, "❌ *GAGAL POTONG SALDO*\n\n" . $deductResult['message']);
-            return;
-        }
-        
-        $transactionId = $deductResult['transaction_id'];
-        $balanceBefore = $deductResult['balance_before'];
-        $balanceAfter = $deductResult['balance_after'];
-        
-        // Save to agent_vouchers
-        if (function_exists('getDBConnection')) {
-            try {
-                $db = getDBConnection();
-                $sql = "INSERT INTO agent_vouchers (agent_id, transaction_id, username, password, profile_name, buy_price, sell_price, sent_via) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 'whatsapp')";
-                $stmt = $db->prepare($sql);
-                $stmt->execute([
-                    $agent['id'],
-                    $transactionId,
-                    $username,
-                    $password,
-                    $profileName,
-                    $buyPrice,
-                    $priceData['sell_price']
-                ]);
-            } catch (Exception $e) {
-                error_log("Error saving agent voucher: " . $e->getMessage());
-            }
+        if ($deductResult['success']) {
+            $balanceBefore = $deductResult['balance_before'];
+            $balanceAfter = $deductResult['balance_after'];
+        } else {
+            // Log error but don't fail the transaction (voucher already created)
+            error_log("Failed to deduct balance for agent $agentId: " . $deductResult['message']);
         }
     }
     
@@ -1151,14 +1069,13 @@ function purchaseVoucher($phone, $profileName, $mode = 'default', $customerPhone
         $voucherMsg .= "Harga: $priceFormatted\n";
     }
     
-    $voucherMsg .= "\nLogin URL:\n";
-    $voucherMsg .= "http://$dnsname/login?username=$username&password=$password\n\n";
-    
-    // Show balance for agent
+    // Show balance for agent (not for admin)
     if (!$isAdmin && $balanceAfter > 0) {
-        $voucherMsg .= "💳 *Saldo Anda: Rp " . number_format($balanceAfter, 0, ',', '.') . "*\n\n";
+        $voucherMsg .= "\n💳 Saldo Anda: Rp " . number_format($balanceAfter, 0, ',', '.') . "\n";
     }
     
+    $voucherMsg .= "\nLogin URL:\n";
+    $voucherMsg .= "http://$dnsname/login?username=$username&password=$password\n\n";
     $voucherMsg .= "━━━━━━━━━━━━━━━━━━━━\n";
     $voucherMsg .= "_Terima kasih telah menggunakan layanan kami_";
     
@@ -1318,42 +1235,6 @@ function addPPPoESecret($phone, $username, $password, $profile) {
     
     // Connect to MikroTik
     $API = new RouterosAPI();
-}
-
-/**
- * Generate Voucher
- */
-function generateVoucher($phone, $profileName, $username, $password, $validity, $sprice, $currency, $isAdmin, $agent) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
     $API->debug = false;
     
     if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
@@ -1370,10 +1251,10 @@ function generateVoucher($phone, $profileName, $username, $password, $validity, 
     }
     
     // Check if profile exists
-    $checkProfile = $API->comm("/ppp/profile/print", array("?name" => $profileName));
+    $checkProfile = $API->comm("/ppp/profile/print", array("?name" => $profile));
     if (empty($checkProfile)) {
         $API->disconnect();
-        sendWhatsAppMessage($phone, "❌ *PROFILE TIDAK DITEMUKAN*\n\nProfile *$profileName* tidak ada di MikroTik.");
+        sendWhatsAppMessage($phone, "❌ *PROFILE TIDAK DITEMUKAN*\n\nProfile *$profile* tidak ada di MikroTik.");
         return;
     }
     
@@ -1382,12 +1263,12 @@ function generateVoucher($phone, $profileName, $username, $password, $validity, 
         "name" => $username,
         "password" => $password,
         "service" => "pppoe",
-        "profile" => $profileName
+        "profile" => $profile
     ));
     
     $API->disconnect();
     
-    sendWhatsAppMessage($phone, "✅ *PPPoE SECRET BERHASIL DITAMBAH*\n\nUsername: *$username*\nProfile: *$profileName*");
+    sendWhatsAppMessage($phone, "✅ *PPPoE SECRET BERHASIL DITAMBAH*\n\nUsername: *$username*\nProfile: *$profile*");
 }
 
 /**
@@ -1539,9 +1420,9 @@ function deletePPPoESecret($phone, $username) {
 }
 
 /**
- * Ping MikroTik
+ * Check MikroTik Ping
  */
-function pingMikroTik($phone) {
+function checkMikroTikPing($phone) {
     global $sessionConfig;
     
     $data = $sessionConfig;
@@ -1586,819 +1467,6 @@ function pingMikroTik($phone) {
         $message = "❌ *PING GAGAL*\n\n";
         $message .= "IP: *$iphost*\n";
         $message .= "Tidak dapat terhubung ke MikroTik.";
-    }
-    
-    sendWhatsAppMessage($phone, $message);
-}
-
-/**
- * Check MikroTik Status
- */
-function checkMikroTikStatus($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Get system info
-    $systemInfo = $API->comm("/system/resource/print");
-    $uptime = $systemInfo[0]['uptime'];
-    $cpuLoad = $systemInfo[0]['cpu-load'];
-    $freeMemory = $systemInfo[0]['free-memory'];
-    $totalMemory = $systemInfo[0]['total-memory'];
-    $freeHDD = $systemInfo[0]['free-hdd-space'];
-    $totalHDD = $systemInfo[0]['total-hdd-space'];
-    
-    $API->disconnect();
-    
-    $message = "✅ *STATUS MIKROTIK*\n\n";
-    $message .= "Uptime: *$uptime*\n";
-    $message .= "CPU Load: *$cpuLoad%*\n";
-    $message .= "Memory: *" . formatBytes($freeMemory) . " / " . formatBytes($totalMemory) . "*\n";
-    $message .= "HDD: *" . formatBytes($freeHDD) . " / " . formatBytes($totalHDD) . "*";
-}
-
-/**
- * Format bytes to human-readable format
- */
-function formatBytes($bytes, $precision = 2) {
-    $units = array('B', 'KB', 'MB', 'GB', 'TB');
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    $bytes /= pow(1024, $pow);
-    return round($bytes, $precision) . ' ' . $units[$pow];
-}
-
-/**
- * Check PPPoE Active
- */
-function checkPPPoEActive($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Get PPPoE active sessions
-    $pppoeActive = $API->comm("/ppp/active/print");
-    $API->disconnect();
-    
-    if (empty($pppoeActive)) {
-        sendWhatsAppMessage($phone, "Tidak ada PPPoE aktif.");
-        return;
-    }
-    
-    $message = "✅ *PPPoE AKTIF*\n\n";
-    $message .= "Total: *" . count($pppoeActive) . "*\n\n";
-    
-    foreach ($pppoeActive as $session) {
-        $username = $session['name'];
-        $uptime = $session['uptime'];
-        $address = $session['address'];
-        $encoding = $session['encoding'];
-        $service = $session['service'];
-        $profile = $session['profile'];
-        $rx = $session['rx-byte'];
-        $tx = $session['tx-byte'];
-        
-        $message .= "Username: *$username*\n";
-        $message .= "Uptime: *$uptime*\n";
-        $message .= "IP Address: *$address*\n";
-        $message .= "Encoding: *$encoding*\n";
-        $message .= "Service: *$service*\n";
-        $message .= "Profile: *$profile*\n";
-        $message .= "Traffic: *" . formatBytes($rx) . " / " . formatBytes($tx) . "*\n\n";
-    }
-    
-    sendWhatsAppMessage($phone, $message);
-}
-
-/**
- * Check MikroTik Status
- */
-function checkMikroTikStatus($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Get system info
-    $systemInfo = $API->comm("/system/resource/print");
-    $uptime = $systemInfo[0]['uptime'];
-    $cpuLoad = $systemInfo[0]['cpu-load'];
-    $freeMemory = $systemInfo[0]['free-memory'];
-    $totalMemory = $systemInfo[0]['total-memory'];
-    $freeHDD = $systemInfo[0]['free-hdd-space'];
-    $totalHDD = $systemInfo[0]['total-hdd-space'];
-    
-    $API->disconnect();
-    
-    $message = "✅ *STATUS MIKROTIK*\n\n";
-    $message .= "Uptime: *$uptime*\n";
-    $message .= "CPU Load: *$cpuLoad%*\n";
-    $message .= "Memory: *" . formatBytes($freeMemory) . " / " . formatBytes($totalMemory) . "*\n";
-    $message .= "HDD: *" . formatBytes($freeHDD) . " / " . formatBytes($totalHDD) . "*";
-}
-/**
- * Check MikroTik Resource
- */
-function checkMikroTikResource($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Get system info
-    $systemInfo = $API->comm("/system/resource/print");
-    $uptime = $systemInfo[0]['uptime'];
-    $cpuLoad = $systemInfo[0]['cpu-load'];
-    $freeMemory = $systemInfo[0]['free-memory'];
-    $totalMemory = $systemInfo[0]['total-memory'];
-    $freeHDD = $systemInfo[0]['free-hdd-space'];
-    $totalHDD = $systemInfo[0]['total-hdd-space'];
-    
-    $API->disconnect();
-    
-    $message = "✅ *STATUS MIKROTIK*\n\n";
-    $message .= "Uptime: *$uptime*\n";
-    $message .= "CPU Load: *$cpuLoad%*\n";
-    $message .= "Memory: *" . formatBytes($freeMemory) . " / " . formatBytes($totalMemory) . "*\n";
-    $message .= "HDD: *" . formatBytes($freeHDD) . " / " . formatBytes($totalHDD) . "*";
-    
-    sendWhatsAppMessage($phone, $message);
-}
-
-/**
- * Disable PPPoE Secret
- */
-function disablePPPoESecret($phone, $username) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Find user
-    $users = $API->comm("/ppp/secret/print", array("?name" => $username));
-    if (empty($users)) {
-        $API->disconnect();
-        sendWhatsAppMessage($phone, "❌ *USERNAME TIDAK DITEMUKAN*\n\nUsername *$username* tidak ada di MikroTik.");
-        return;
-    }
-    
-    $userId = $users[0]['.id'];
-    
-    // Disable user
-    $API->comm("/ppp/secret/disable", array(".id" => $userId));
-    
-    $API->disconnect();
-    
-    sendWhatsAppMessage($phone, "✅ *PPPoE SECRET BERHASIL DINONAKTIFKAN*\n\nUsername: *$username*");
-}
-
-/**
- * Disable Hotspot User
- */
-function disableHotspotUser($phone, $username) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Find user
-    $users = $API->comm("/ip/hotspot/user/print", array("?name" => $username));
-    if (empty($users)) {
-        $API->disconnect();
-        sendWhatsAppMessage($phone, "❌ *USERNAME TIDAK DITEMUKAN*\n\nUsername *$username* tidak ada di MikroTik.");
-        return;
-    }
-    
-    $userId = $users[0]['.id'];
-    
-    // Disable user
-    $API->comm("/ip/hotspot/user/disable", array(".id" => $userId));
-    
-    $API->disconnect();
-    
-    sendWhatsAppMessage($phone, "✅ *HOTSPOT USER BERHASIL DINONAKTIFKAN*\n\nUsername: *$username*");
-}
-
-/**
- * Enable PPPoE Secret
- */
-function enablePPPoESecret($phone, $username) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Find user
-    $users = $API->comm("/ppp/secret/print", array("?name" => $username));
-    if (empty($users)) {
-        $API->disconnect();
-        sendWhatsAppMessage($phone, "❌ *USERNAME TIDAK DITEMUKAN*\n\nUsername *$username* tidak ada di MikroTik.");
-        return;
-    }
-    
-    $userId = $users[0]['.id'];
-    
-    // Enable user
-    $API->comm("/ppp/secret/enable", array(".id" => $userId));
-    
-    $API->disconnect();
-    
-    sendWhatsAppMessage($phone, "✅ *PPPoE SECRET BERHASIL DIHIDUPKAN*\n\nUsername: *$username*");
-}
-
-/**
- * Enable Hotspot User
- */
-function enableHotspotUser($phone, $username) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Find user
-    $users = $API->comm("/ip/hotspot/user/print", array("?name" => $username));
-    if (empty($users)) {
-        $API->disconnect();
-        sendWhatsAppMessage($phone, "❌ *USERNAME TIDAK DITEMUKAN*\n\nUsername *$username* tidak ada di MikroTik.");
-        return;
-    }
-    
-    $userId = $users[0]['.id'];
-    
-    // Enable user
-    $API->comm("/ip/hotspot/user/enable", array(".id" => $userId));
-    
-    $API->disconnect();
-    
-    sendWhatsAppMessage($phone, "✅ *HOTSPOT USER BERHASIL DIHIDUPKAN*\n\nUsername: *$username*");
-}
-
-/**
- * Check PPPoE Offline
- */
-function checkPPPoEOffline($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Get PPPoE secrets
-    $pppoeSecrets = $API->comm("/ppp/secret/print");
-    $API->disconnect();
-    
-    if (empty($pppoeSecrets)) {
-        sendWhatsAppMessage($phone, "Tidak ada PPPoE secret.");
-        return;
-    }
-    
-    $offlineUsers = [];
-    
-    foreach ($pppoeSecrets as $secret) {
-        $username = $secret['name'];
-        $disabled = $secret['disabled'];
-        $uptime = $secret['uptime'];
-        
-        if ($disabled == 'true' || empty($uptime)) {
-            $offlineUsers[] = $username;
-        }
-    }
-    
-    if (empty($offlineUsers)) {
-        sendWhatsAppMessage($phone, "Tidak ada PPPoE offline.");
-        return;
-    }
-    
-    $message = "✅ *PPPoE OFFLINE*\n\n";
-    $message .= "Total: *" . count($offlineUsers) . "*\n\n";
-    $message .= implode("\n", $offlineUsers);
-    
-    sendWhatsAppMessage($phone, $message);
-}
-
-/**
- * Check Digiflazz Balance
- */
-function checkDigiflazzBalance($phone)
-{
-    $url = DIGIFLAZZ_API_URL . "/cek_saldo";
-    $data = [
-        "username" => DIGIFLAZZ_USERNAME,
-        "sign" => md5(DIGIFLAZZ_USERNAME . DIGIFLAZZ_API_KEY),
-    ];
-
-    $response = sendPostRequest($url, $data);
-    $response = json_decode($response, true);
-
-    if ($response['data']['status'] == '00') {
-        $diskTotal = $response['data']['diskon_total'];
-        $diskTotalFormatted = number_format($diskTotal, 0, ',', '.');
-        $message = "✅ *SALDO DIGIFLAZZ*\n\n";
-        $message .= "Total: *$diskTotalFormatted*";
-        
-        sendWhatsAppMessage($phone, $message);
-    } else {
-        sendWhatsAppMessage($phone, "Gagal mendapatkan saldo Digiflazz.");
-    }
-}
-
-/**
-/**
- * Check Digiflazz Balance
- */
-function checkDigiflazzBalance($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        sendWhatsAppMessage($phone, "❌ *GAGAL TERHUBUNG*\n\nTidak dapat terhubung ke MikroTik.");
-        return;
-    }
-    
-    // Get Digiflazz balance
-    $digiflazzBalance = $API->comm("/system/script/print", array("?name" => "digiflazz_balance"));
-    $API->disconnect();
-    
-    if (empty($digiflazzBalance)) {
-        sendWhatsAppMessage($phone, "❌ *DIGIFLAZZ BALANCE TIDAK DITEMUKAN*\n\nPastikan script `digiflazz_balance` sudah dibuat di MikroTik.");
-        return;
-    }
-    
-    $balance = $digiflazzBalance[0]['source'];
-    
-    sendWhatsAppMessage($phone, "✅ *DIGIFLAZZ BALANCE*\n\nSaldo: *$balance*");
-}
-
-/**
- * Format bytes to human-readable format
- */
-function formatBytes($bytes, $precision = 2) {
-    $units = array('B', 'KB', 'MB', 'GB', 'TB');
-    
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    
-    $bytes /= pow(1024, $pow);
-    
-    return round($bytes, $precision) . ' ' . $units[$pow];
-}
-
-/**
- * Log webhook error
- */
-function logWebhookError($phone, $command, $message) {
-    error_log("WhatsApp Webhook Error: [$phone] [$command] $message");
-}
-
-/**
- * Log WhatsApp transaction
- */
-function logWhatsAppTransaction($phone, $username, $status, $data) {
-    error_log("WhatsApp Transaction: [$phone] [$username] [$status] $data");
-}
-
-/**
- * Send WhatsApp message
- */
-function sendWhatsAppMessage($phone, $message) {
-    // Format phone number
-    $phone = formatWhatsAppNumber($phone);
-    
-    // Check if db_config exists
-    if (!function_exists('getDBConnection')) {
-        return ['success' => false, 'message' => 'Database connection not available'];
-    }
-    
-    try {
-        $db = getDBConnection();
-        if (!$db) {
-            return ['success' => false, 'message' => 'Database connection failed'];
-        }
-        
-        $stmt = $db->query("SELECT setting_value FROM agent_settings WHERE setting_key = 'whatsapp_webhook_url'");
-        $result = $stmt->fetch();
-        
-        if ($result) {
-            $webhookUrl = $result['setting_value'];
-            
-            // Prepare data
-            $data = [
-                'phone' => $phone,
-                'message' => $message
-            ];
-            
-            // Send POST request
-            $ch = curl_init($webhookUrl);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            
-            if ($httpCode == 200) {
-                return ['success' => true, 'message' => $response];
-            } else {
-                return ['success' => false, 'message' => "HTTP Error: $httpCode"];
-            }
-        } else {
-            return ['success' => false, 'message' => 'WhatsApp webhook URL not set'];
-        }
-    } catch (Exception $e) {
-        return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
-    }
-}
-
-/**
- * Format WhatsApp number
- */
-function formatWhatsAppNumber($phone) {
-    // Remove non-numeric characters
-    $phone = preg_replace('/[^0-9]/', '', $phone);
-    
-    // Add country code if missing
-    if (strlen($phone) == 10) {
-        $phone = '62' . $phone;
-    }
-    
-    return $phone;
-}
-
-/**
- * Decrypt password
- */
-function decrypt($password) {
-    // Placeholder for decryption logic
-    return $password;
-}
-
-/**
- * Check MikroTik Ping
- */
-function checkMikroTikPing($phone) {
-    global $sessionConfig;
-    
-    $data = $sessionConfig;
-    if (empty($data) || !is_array($data)) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nKonfigurasi session tidak ter-load.");
-        return;
-    }
-    
-    // Get first session
-    $sessions = array_keys($data);
-    $session = null;
-    foreach ($sessions as $s) {
-        if ($s != 'mikhmon') {
-            $session = $s;
-            break;
-        }
-    }
-    
-    if (!$session) {
-        sendWhatsAppMessage($phone, "❌ *SISTEM ERROR*\n\nSession MikroTik tidak ditemukan.");
-        return;
-    }
-    
-    // Load session config
-    $iphost = explode('!', $data[$session][1])[1];
-    $userhost = explode('@|@', $data[$session][2])[1];
-    $passwdhost = explode('#|#', $data[$session][3])[1];
-    
-    // Connect to MikroTik
-    $API = new RouterosAPI();
-    $API->debug = false;
-    
-    if ($API->connect($iphost, $userhost, decrypt($passwdhost))) {
-        $API->disconnect();
-        $message = "✅ *KONEKSI BERHASIL*\n\n";
-        $message .= "Terhubung ke MikroTik:\n";
-        $message .= "IP: *$iphost*\n";
-        $message .= "User: *$userhost*";
-    } else {
-        $message = "❌ *KONEKSI GAGAL*\n\n";
-        $message .= "Tidak dapat terhubung ke MikroTik:\n";
-        $message .= "IP: *$iphost*\n";
-        $message .= "User: *$userhost*";
     }
     
     sendWhatsAppMessage($phone, $message);
@@ -2620,8 +1688,6 @@ function checkMikroTikResource($phone) {
     
     sendWhatsAppMessage($phone, $message);
 }
-
-    $message .= "💿 *DISK*\n";
 
 /**
  * Disable PPPoE Secret
@@ -3013,17 +2079,17 @@ function sendHelp($phone) {
     $message .= "*Perintah yang tersedia:*\n\n";
     $message .= "📋 *HARGA* atau *PAKET*\n";
     $message .= "Melihat daftar paket dan harga\n\n";
-    $message .= "🎫 *VOUCHER [USERNAME] <NAMA_PAKET> [NOMER>*\n";
+    $message .= "🎫 *VOUCHER [USERNAME] <NAMA_PAKET> [NOMER]*\n";
     $message .= "Membeli voucher (Username = Password)\n";
     $message .= "Contoh: VOUCHER 3K\n";
     $message .= "Contoh dengan nomor: VOUCHER 3K 08123456789\n";
     $message .= "Contoh username manual: VOUCHER user123 3K\n";
     $message .= "Contoh lengkap: VOUCHER user123 3K 08123456789\n";
     $message .= "Voucher akan dikirim ke nomor pembeli dan agent\n\n";
-    $message .= "⚡ *VCR [USERNAME] <NAMA_PAKET> [NOMER>*\n";
+    $message .= "⚡ *VCR [USERNAME] <NAMA_PAKET> [NOMER]*\n";
     $message .= "Perintah singkat untuk VOUCHER\n";
     $message .= "Contoh: VCR 3K, VCR user123 3K 08123456789\n\n";
-    $message .= "⚙️ *GENERATE [USERNAME] <NAMA_PAKET> [NOMER>*\n";
+    $message .= "⚙️ *GENERATE [USERNAME] <NAMA_PAKET> [NOMER]*\n";
     $message .= "Alias untuk VOUCHER\n";
     $message .= "Contoh: GENERATE 3K, GENERATE user123 3K 08123456789\n\n";
     $message .= "👤 *MEMBER <NAMA_PAKET>*\n";
@@ -3167,25 +2233,28 @@ function purchaseDigiflazz($phone, $sku, $customerNo) {
             return;
         }
         
-        // Check if admin
+        // Check if user is admin or agent
         $isAdmin = isAdminNumber($phone);
+        $agent = null;
+        $agentId = null;
         
-        // Check if agent (only for non-admin users)
         if (!$isAdmin) {
+            // Try to get agent by phone
             $agent = getAgentByPhone($phone);
+            
             if (!$agent) {
                 sendWhatsAppMessage($phone, "❌ *AKSES DITOLAK*\n\nFitur ini hanya untuk Admin & Agent.\n\nHubungi administrator untuk registrasi agent.");
                 return;
             }
             
+            $agentId = $agent['id'];
+            
+            // Check agent status
             if ($agent['status'] !== 'active') {
                 sendWhatsAppMessage($phone, "❌ *AKUN TIDAK AKTIF*\n\nAkun agent Anda tidak aktif.\nHubungi administrator.");
                 return;
             }
         }
-        
-        // Get first session (you can modify this to use specific session)
-        $session = $digiflazz->getSessions()[0];
         
         // Calculate price
         $digiflazzSettings = $digiflazz->getSettings();
