@@ -21,14 +21,20 @@ if (isset($_GET['action'])) {
     if ($action == 'activate' && $agentId) {
         $agent->updateAgent($agentId, ['status' => 'active']);
         echo "<script>alert('Agent berhasil diaktifkan'); window.location='?hotspot=agent-list&session=$session';</script>";
+        exit;
     } elseif ($action == 'deactivate' && $agentId) {
         $agent->updateAgent($agentId, ['status' => 'inactive']);
         echo "<script>alert('Agent berhasil dinonaktifkan'); window.location='?hotspot=agent-list&session=$session';</script>";
+        exit;
     } elseif ($action == 'delete' && $agentId) {
-        if (confirm('Yakin ingin menghapus agent ini?')) {
-            $agent->deleteAgent($agentId);
+        // Confirmation already handled in onclick event
+        $result = $agent->deleteAgent($agentId);
+        if ($result['success']) {
             echo "<script>alert('Agent berhasil dihapus'); window.location='?hotspot=agent-list&session=$session';</script>";
+        } else {
+            echo "<script>alert('Gagal menghapus agent: " . addslashes($result['message']) . "'); window.location='?hotspot=agent-list&session=$session';</script>";
         }
+        exit;
     }
 }
 
