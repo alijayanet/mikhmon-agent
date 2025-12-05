@@ -1157,6 +1157,59 @@ function ensureAgent($pdo, $code, $name, $status = 'active') {
                         logMessage('✅ INSTALASI SELESAI!', 'success');
                         ?>
                     </div>
+
+                    <!-- Quick Access Links -->
+                    <div style="margin-top: 30px; text-align: left;">
+                        <h3 style="font-size: 18px; margin-bottom: 15px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                            <i class="fas fa-link"></i> Akses Cepat Aplikasi
+                        </h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px;">
+                            <!-- Agent Dashboard -->
+                            <a href="agent/" target="_blank" style="text-decoration: none; color: inherit;">
+                                <div style="background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--border); transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='var(--primary)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                                    <div style="font-weight: 700; color: var(--primary); margin-bottom: 8px; font-size: 16px;">
+                                        <i class="fas fa-user-tie"></i> Agent Dashboard
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-light); line-height: 1.4;">
+                                        Login area untuk Reseller / Agen Topup & Voucher.
+                                    </div>
+                                    <div style="margin-top: 10px; font-size: 12px; color: var(--primary); font-weight: 600;">
+                                        Buka Link <i class="fas fa-external-link-alt"></i>
+                                    </div>
+                                </div>
+                            </a>
+
+                            <!-- Public Sales -->
+                            <a href="public/index.php?agent=AG001" target="_blank" style="text-decoration: none; color: inherit;">
+                                <div style="background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--border); transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='var(--success)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                                    <div style="font-weight: 700; color: var(--success); margin-bottom: 8px; font-size: 16px;">
+                                        <i class="fas fa-shopping-cart"></i> Penjualan Online
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-light); line-height: 1.4;">
+                                        Halaman katalog & pembelian voucher untuk user public.
+                                    </div>
+                                    <div style="margin-top: 10px; font-size: 12px; color: var(--success); font-weight: 600;">
+                                        Buka Link <i class="fas fa-external-link-alt"></i>
+                                    </div>
+                                </div>
+                            </a>
+
+                            <!-- Billing Portal -->
+                            <a href="public/billing_login.php" target="_blank" style="text-decoration: none; color: inherit;">
+                                <div style="background: #fff; padding: 20px; border-radius: 12px; border: 1px solid var(--border); transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='var(--warning)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform='translateY(0)'">
+                                    <div style="font-weight: 700; color: var(--warning); margin-bottom: 8px; font-size: 16px;">
+                                        <i class="fas fa-file-invoice-dollar"></i> Portal Pelanggan
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--text-light); line-height: 1.4;">
+                                        Login area pelanggan bulanan (Cek Tagihan & Bayar).
+                                    </div>
+                                    <div style="margin-top: 10px; font-size: 12px; color: var(--warning); font-weight: 600;">
+                                        Buka Link <i class="fas fa-external-link-alt"></i>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
                     
                     <div style="text-align: center; margin-top: 30px;">
                         <a href="index.php" class="btn btn-success btn-block" style="padding: 16px; font-size: 18px;">
