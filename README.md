@@ -80,25 +80,6 @@ Proyek ini merupakan pengembangan lanjutan dari [MikhMon V3](https://github.com/
 - One-click installation
 - Auto-fix compatibility issues
 
-## 🏗️ Arsitektur Sistem
-
-```mermaid
-graph TB
-    A[Customer] --> B[Public Order Page]
-    C[Agent] --> D[Agent Panel]
-    E[Admin] --> F[Admin Panel]
-    B --> G[Payment Gateway]
-    D --> H[MikhMon Core]
-    F --> H
-    G --> I[Payment Callback]
-    I --> J[Database]
-    H --> J
-    J --> K[MikroTik Router]
-    L[WhatsApp] --> M[Webhook Handler]
-    M --> H
-    H --> N[Notification System]
-    N --> L
-```
 
 ### Komponen Utama:
 1. **Frontend Public** - Landing page untuk pembelian langsung
@@ -211,6 +192,7 @@ Project Link: [https://github.com/alijayanet/mikhmon-agent](https://github.com/a
   Made with ❤️ by Ali Jaya Net
 
 </p>
+
 
 
 
