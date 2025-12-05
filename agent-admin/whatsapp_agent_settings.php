@@ -56,6 +56,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
             $stmt->execute([$key, $value, $description, $value]);
         }
         
+        // Telegram Bot Settings
+        $telegramSettings = [
+            'telegram_enabled' => isset($_POST['telegram_enabled']) ? '1' : '0',
+            'telegram_bot_token' => trim($_POST['telegram_bot_token'] ?? ''),
+            'telegram_admin_chat_ids' => trim($_POST['telegram_admin_chat_ids'] ?? ''),
+            'telegram_webhook_mode' => isset($_POST['telegram_webhook_mode']) ? '1' : '0'
+        ];
+        
+        // Save to telegram_settings table
+        $telegramStmt = $db->prepare("
+            INSERT INTO telegram_settings (setting_key, setting_value) 
+            VALUES (?, ?) 
+            ON DUPLICATE KEY UPDATE setting_value = ?
+        ");
+        
+        foreach ($telegramSettings as $key => $value) {
+            $telegramStmt->execute([$key, $value, $value]);
+        }
+        
+        // Update telegram_config.php file
+        $telegramConfigFile = '../include/telegram_config.php';
+        if (file_exists($telegramConfigFile)) {
+            $configContent = file_get_contents($telegramConfigFile);
+            
+            // Update bot token
+            $configContent = preg_replace(
+                "/define\('TELEGRAM_BOT_TOKEN', '.*?'\);/",
+                "define('TELEGRAM_BOT_TOKEN', '{$telegramSettings['telegram_bot_token']}');",
+                $configContent
+            );
+            
+            // Update enabled status
+            $enabledValue = $telegramSettings['telegram_enabled'] == '1' ? 'true' : 'false';
+            $configContent = preg_replace(
+                "/define\('TELEGRAM_ENABLED', .*?\);/",
+                "define('TELEGRAM_ENABLED', $enabledValue);",
+                $configContent
+            );
+            
+            // Update webhook mode
+            $webhookValue = $telegramSettings['telegram_webhook_mode'] == '1' ? 'true' : 'false';
+            $configContent = preg_replace(
+                "/define\('TELEGRAM_WEBHOOK_MODE', .*?\);/",
+                "define('TELEGRAM_WEBHOOK_MODE', $webhookValue);",
+                $configContent
+            );
+            
+            file_put_contents($telegramConfigFile, $configContent);
+        }
+        
         // Message Settings
         $settings = [
             'wa_message_header' => $_POST['message_header'] ?? '',
@@ -90,6 +140,12 @@ $db = getDBConnection();
 $stmt = $db->query("SELECT setting_key, setting_value FROM agent_settings WHERE setting_key LIKE 'admin_whatsapp_numbers' OR setting_key LIKE 'wa_%' OR setting_key LIKE 'whatsapp_api_%'");
 $currentSettings = [];
 while ($row = $stmt->fetch()) {
+    $currentSettings[$row['setting_key']] = $row['setting_value'];
+}
+
+// Load Telegram settings
+$telegramStmt = $db->query("SELECT setting_key, setting_value FROM telegram_settings");
+while ($row = $telegramStmt->fetch()) {
     $currentSettings[$row['setting_key']] = $row['setting_value'];
 }
 
@@ -369,6 +425,58 @@ input.form-control:focus {
                     <div class="help-text">
                         • API Key/Token dari provider WhatsApp gateway Anda<br>
                         • <strong style="color: #d9534f;">WAJIB DIISI</strong> agar voucher public bisa dikirim via WhatsApp
+                    </div>
+                </div>
+                </div>
+            </div>
+            
+            <!-- Telegram Bot Settings -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fab fa-telegram"></i> Telegram Bot Settings</h3>
+                </div>
+                <div class="card-body">
+                <div class="form-group">
+                    <label>Enable Telegram Bot</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" name="telegram_enabled" id="telegram_enabled" value="1" <?= isset($currentSettings['telegram_enabled']) && $currentSettings['telegram_enabled'] == '1' ? 'checked' : ''; ?>>
+                        <label for="telegram_enabled">Aktifkan Bot Telegram</label>
+                    </div>
+                    <div class="help-text">
+                        • Bot Telegram untuk menerima perintah dari user<br>
+                        • Gratis, tidak ada biaya per pesan
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Telegram Bot Token</label>
+                    <input type="text" name="telegram_bot_token" class="form-control" value="<?= htmlspecialchars($currentSettings['telegram_bot_token'] ?? ''); ?>" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz" style="font-family: monospace;">
+                    <div class="help-text">
+                        • Dapatkan dari <strong>@BotFather</strong> di Telegram (kirim /newbot)<br>
+                        • Token format: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Admin Chat IDs</label>
+                    <input type="text" name="telegram_admin_chat_ids" class="form-control" value="<?= htmlspecialchars($currentSettings['telegram_admin_chat_ids'] ?? ''); ?>" placeholder="123456789, 987654321">
+                    <div class="help-text">
+                        • Dapatkan Chat ID dari <strong>@userinfobot</strong> di Telegram<br>
+                        • Pisahkan dengan koma (,) untuk multiple admin<br>
+                        • Admin dapat generate voucher tanpa pemotongan saldo
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Webhook Mode</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" name="telegram_webhook_mode" id="telegram_webhook_mode" value="1" <?= isset($currentSettings['telegram_webhook_mode']) && $currentSettings['telegram_webhook_mode'] == '1' ? 'checked' : ''; ?>>
+                        <label for="telegram_webhook_mode">Use Webhook (Recommended)</label>
+                    </div>
+                    <div class="help-text">
+                        • Webhook lebih efisien (butuh HTTPS)<br>
+                        • Uncheck jika server belum ada SSL certificate<br>
+                        • Setup webhook di <a href="../settings/telegram_settings.php" target="_blank" style="color: #0088cc;">Telegram Settings</a>
                     </div>
                 </div>
                 </div>
