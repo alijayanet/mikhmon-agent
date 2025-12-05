@@ -10,6 +10,113 @@ $error = '';
 $success = '';
 
 // Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_telegram'])) {
+    try {
+        // Query database directly to get fresh bot token (avoid require_once cache)
+        $db = getDBConnection();
+        $stmt = $db->prepare("SELECT setting_value FROM telegram_settings WHERE setting_key = 'telegram_bot_token'");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $botToken = $result['setting_value'] ?? '';
+        
+        if (empty($botToken)) {
+            $error = 'Bot token belum dikonfigurasi. Silakan isi bot token terlebih dahulu.';
+        } else {
+            // Test connection to Telegram API
+            $url = "https://api.telegram.org/bot" . $botToken . "/getMe";
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For local testing
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            if ($response === false) {
+                $error = 'Connection failed: ' . $curlError;
+            } elseif ($httpCode == 200) {
+                $result = json_decode($response, true);
+                if (isset($result['ok']) && $result['ok']) {
+                    $botInfo = $result['result'];
+                    $success = '✅ Connection successful! Bot: @' . $botInfo['username'] . ' (' . $botInfo['first_name'] . ')';
+                } else {
+                    $error = 'Connection failed: ' . ($result['description'] ?? 'Unknown error');
+                }
+            } else {
+                $error = 'Connection failed: HTTP ' . $httpCode;
+            }
+        }
+    } catch (Exception $e) {
+        $error = 'Error testing connection: ' . $e->getMessage();
+    }
+}
+
+// Handle set webhook
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_webhook'])) {
+    try {
+        $db = getDBConnection();
+        $stmt = $db->prepare("SELECT setting_value FROM telegram_settings WHERE setting_key = 'telegram_bot_token'");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $botToken = $result['setting_value'] ?? '';
+        
+        if (empty($botToken)) {
+            $error = 'Bot token belum dikonfigurasi.';
+        } else {
+            $webhookUrl = 'https://' . $_SERVER['HTTP_HOST'] . '/api/telegram_webhook.php';
+            $url = "https://api.telegram.org/bot{$botToken}/setWebhook?url=" . urlencode($webhookUrl);
+            
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $response = curl_exec($ch);
+            curl_close($ch);
+            
+            $result = json_decode($response, true);
+            if (isset($result['ok']) && $result['ok']) {
+                $success = '✅ Webhook set successfully! URL: ' . $webhookUrl;
+            } else {
+                $error = 'Failed to set webhook: ' . ($result['description'] ?? 'Unknown error');
+            }
+        }
+    } catch (Exception $e) {
+        $error = 'Error setting webhook: ' . $e->getMessage();
+    }
+}
+
+// Handle delete webhook
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_webhook'])) {
+    try {
+        $db = getDBConnection();
+        $stmt = $db->prepare("SELECT setting_value FROM telegram_settings WHERE setting_key = 'telegram_bot_token'");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $botToken = $result['setting_value'] ?? '';
+        
+        if (empty($botToken)) {
+            $error = 'Bot token belum dikonfigurasi.';
+        } else {
+            $url = "https://api.telegram.org/bot{$botToken}/deleteWebhook";
+            
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $response = curl_exec($ch);
+            curl_close($ch);
+            
+            $result = json_decode($response, true);
+            if (isset($result['ok']) && $result['ok']) {
+                $success = '✅ Webhook deleted successfully!';
+            } else {
+                $error = 'Failed to delete webhook: ' . ($result['description'] ?? 'Unknown error');
+            }
+        }
+    } catch (Exception $e) {
+        $error = 'Error deleting webhook: ' . $e->getMessage();
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     try {
         $db = getDBConnection();
@@ -446,6 +553,27 @@ input.form-control:focus {
                         • Webhook lebih efisien (butuh HTTPS)<br>
                         • Uncheck jika server belum ada SSL certificate<br>
                         • Setup webhook di <a href="../settings/telegram_settings.php" target="_blank" style="color: #0088cc;">Telegram Settings</a>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                    <label>Webhook & Connection Management</label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                        <button type="submit" name="test_telegram" class="btn" style="background: #0088cc; color: white; display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="fa fa-plug"></i> Test Connection
+                        </button>
+                        <button type="submit" name="set_webhook" class="btn" style="background: #10b981; color: white; display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="fa fa-link"></i> Set Webhook
+                        </button>
+                        <button type="submit" name="delete_webhook" class="btn" style="background: #ef4444; color: white; display: inline-flex; align-items: center; gap: 8px;">
+                            <i class="fa fa-unlink"></i> Delete Webhook
+                        </button>
+                    </div>
+                    <div class="help-text" style="margin-top: 10px;">
+                        • <strong>Test Connection:</strong> Cek apakah bot token valid<br>
+                        • <strong>Set Webhook:</strong> Aktifkan webhook untuk menerima pesan (butuh HTTPS)<br>
+                        • <strong>Delete Webhook:</strong> Hapus webhook jika ingin switch ke long polling<br>
+                        • Webhook URL: <code>https://<?= $_SERVER['HTTP_HOST'] ?>/api/telegram_webhook.php</code>
                     </div>
                 </div>
                 </div>
