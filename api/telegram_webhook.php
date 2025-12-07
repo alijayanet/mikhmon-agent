@@ -79,12 +79,33 @@ function processTelegramCommand($chatId, $message, $username = '', $firstName = 
     
     // Handle Telegram-specific commands
     if (strpos($message, '/start') === 0) {
-        sendTelegramWelcome($chatId, $firstName);
+        try {
+            // Check if user is admin
+            if (isTelegramAdmin($chatId)) {
+                showTelegramAdminMenu($chatId);
+            } else {
+                sendTelegramWelcome($chatId, $firstName);
+            }
+        } catch (Exception $e) {
+            error_log("Error in /start command: " . $e->getMessage());
+            sendTelegramWelcome($chatId, $firstName);
+        }
         return;
     }
     
     if (strpos($message, '/help') === 0) {
         sendTelegramHelp($chatId);
+        return;
+    }
+    
+    // Handle /menu command for agents
+    if (strpos($message, '/menu') === 0) {
+        try {
+            showTelegramAgentMenu($chatId);
+        } catch (Exception $e) {
+            error_log("Error showing agent menu: " . $e->getMessage());
+            sendTelegramMessage($chatId, "❌ Terjadi kesalahan. Silakan gunakan perintah text: HARGA");
+        }
         return;
     }
     
@@ -471,15 +492,20 @@ function isTelegramAdmin($chatId) {
  * Handle callback query from inline keyboards
  */
 function handleCallbackQuery($chatId, $data, $callbackQueryId) {
-    // Answer callback query to remove loading state
+    // INSTANT answer callback query to remove loading state
     $url = TELEGRAM_API_URL . '/answerCallbackQuery';
-    $postData = ['callback_query_id' => $callbackQueryId];
+    $postData = [
+        'callback_query_id' => $callbackQueryId,
+        'text' => '⏳ Memproses...',
+        'show_alert' => false
+    ];
     
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 1); // Quick timeout
     curl_exec($ch);
     curl_close($ch);
     
@@ -500,6 +526,207 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             break;
         case 'help':
             sendTelegramHelp($chatId);
+            break;
+        case 'agent_buy':
+            if (isset($parts[1])) {
+                try {
+                    $profileName = $parts[1];
+                    // Use existing voucher purchase function
+                    purchaseTelegramVoucher($chatId, $profileName, false); // false = not admin
+                } catch (Exception $e) {
+                    error_log("Error in agent_buy callback: " . $e->getMessage());
+                    sendTelegramMessage($chatId, "❌ Terjadi kesalahan saat generate voucher.\n\nSilakan coba lagi atau gunakan perintah: VOUCHER " . $profileName);
+                }
+            }
+            break;
+        
+        // Agent menu callbacks
+        case 'agent_quick':
+            try {
+                showTelegramAgentQuickMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in agent_quick callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: HARGA");
+            }
+            break;
+            
+        case 'agent_packages':
+            try {
+                showTelegramAgentPackagesMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in agent_packages callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: HARGA");
+            }
+            break;
+            
+        case 'agent_balance':
+            try {
+                $agent = getTelegramAgentByPhone($chatId);
+                if ($agent) {
+                    $message = "💰 *INFO SALDO AGENT*\n\n";
+                    $message .= "Saldo Saat Ini: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n";
+                    $message .= "Status: " . ($agent['status'] == 'active' ? '✅ Aktif' : '❌ Nonaktif') . "\n\n";
+                    $message .= "Untuk top up saldo, hubungi administrator.";
+                    sendTelegramMessage($chatId, $message);
+                } else {
+                    sendTelegramMessage($chatId, "❌ Data agent tidak ditemukan.");
+                }
+            } catch (Exception $e) {
+                error_log("Error in agent_balance callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.");
+            }
+            break;
+            
+        case 'agent_menu':
+            try {
+                showTelegramAgentMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in agent_menu callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: /menu");
+            }
+            break;
+        
+        // Admin menu callbacks
+        case 'admin_main':
+            try {
+                showTelegramAdminMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in admin_main callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: /start");
+            }
+            break;
+            
+        case 'admin_voucher':
+            try {
+                showTelegramAdminVoucherMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in admin_voucher callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: HARGA");
+            }
+            break;
+            
+        case 'admin_pppoe':
+            try {
+                showTelegramAdminPPPoEMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in admin_pppoe callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: PPP");
+            }
+            break;
+            
+        case 'admin_settings':
+            try {
+                showTelegramAdminSettingsMenu($chatId);
+            } catch (Exception $e) {
+                error_log("Error in admin_settings callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: PING");
+            }
+            break;
+            
+        case 'admin_buy':
+            if (isset($parts[1])) {
+                try {
+                    $profileName = $parts[1];
+                    // Use existing voucher purchase function for admin (no balance deduction)
+                    purchaseTelegramVoucher($chatId, $profileName, true); // true = admin
+                } catch (Exception $e) {
+                    error_log("Error in admin_buy callback: " . $e->getMessage());
+                    sendTelegramMessage($chatId, "❌ Terjadi kesalahan saat generate voucher.\n\nSilakan coba lagi atau gunakan perintah: VOUCHER " . $profileName);
+                }
+            }
+            break;
+            
+        case 'admin_all_packages':
+            try {
+                // Redirect to existing HARGA command (which loads MikroTik data)
+                processTelegramCommand($chatId, 'HARGA');
+            } catch (Exception $e) {
+                error_log("Error in admin_all_packages callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: HARGA");
+            }
+            break;
+            
+        case 'admin_help':
+            try {
+                sendTelegramHelp($chatId);
+            } catch (Exception $e) {
+                error_log("Error in admin_help callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: /help");
+            }
+            break;
+            
+        // PPPoE callbacks - redirect to existing commands
+        case 'admin_ppp_active':
+            try {
+                processTelegramCommand($chatId, 'PPP');
+            } catch (Exception $e) {
+                error_log("Error in admin_ppp_active callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: PPP");
+            }
+            break;
+            
+        case 'admin_ppp_offline':
+            try {
+                processTelegramCommand($chatId, 'PPP OFFLINE');
+            } catch (Exception $e) {
+                error_log("Error in admin_ppp_offline callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: PPP OFFLINE");
+            }
+            break;
+            
+        case 'admin_ppp_edit':
+            try {
+                sendTelegramMessage($chatId, "✏️ *PPP EDIT*\n\nGunakan perintah:\n`EDIT [nama_pppoe] [profile_baru]`\n\nContoh:\n`EDIT user123 3JAM`");
+            } catch (Exception $e) {
+                error_log("Error in admin_ppp_edit callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: EDIT [nama] [profile]");
+            }
+            break;
+            
+        case 'admin_ppp_tools':
+            try {
+                sendTelegramMessage($chatId, "🔧 *PPP TOOLS*\n\nPerintah yang tersedia:\n• `ENABLE [nama]` - Aktifkan PPPoE\n• `DISABLE [nama]` - Nonaktifkan PPPoE\n• `REMOVE [nama]` - Hapus PPPoE");
+            } catch (Exception $e) {
+                error_log("Error in admin_ppp_tools callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.");
+            }
+            break;
+            
+        // Settings callbacks - redirect to existing commands
+        case 'admin_ping':
+            try {
+                processTelegramCommand($chatId, 'PING');
+            } catch (Exception $e) {
+                error_log("Error in admin_ping callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: PING");
+            }
+            break;
+            
+        case 'admin_resource':
+            try {
+                processTelegramCommand($chatId, 'RESOURCE');
+            } catch (Exception $e) {
+                error_log("Error in admin_resource callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: RESOURCE");
+            }
+            break;
+            
+        case 'admin_reboot':
+            try {
+                sendTelegramMessage($chatId, "🔄 *REBOOT SYSTEM*\n\n⚠️ **PERINGATAN**\nReboot akan memutus semua koneksi!\n\nGunakan perintah:\n`REBOOT CONFIRM`\n\nUntuk membatalkan, abaikan pesan ini.");
+            } catch (Exception $e) {
+                error_log("Error in admin_reboot callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.");
+            }
+            break;
+            
+        case 'admin_info':
+            try {
+                processTelegramCommand($chatId, 'INFO');
+            } catch (Exception $e) {
+                error_log("Error in admin_info callback: " . $e->getMessage());
+                sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: INFO");
+            }
             break;
     }
 }
@@ -622,6 +849,87 @@ function sendTelegramPriceList($chatId) {
 }
 
 /**
+ * Generate Telegram voucher credentials
+ */
+function generateTelegramVoucherCredentials() {
+    // Load VoucherGenerator if available
+    if (file_exists(__DIR__ . '/../lib/VoucherGenerator.class.php')) {
+        include_once(__DIR__ . '/../lib/VoucherGenerator.class.php');
+        $voucherGen = new VoucherGenerator();
+        $voucher = $voucherGen->generateVoucher();
+        return [
+            'username' => $voucher['username'],
+            'password' => $voucher['password']
+        ];
+    } else {
+        // Fallback generation
+        $username = 'tg' . strtolower(substr(md5(time() . rand()), 0, 8));
+        $password = strtolower(substr(md5(time() . rand() . 'pass'), 0, 8));
+        return [
+            'username' => $username,
+            'password' => $password
+        ];
+    }
+}
+
+/**
+ * Get agent by phone number (for Telegram)
+ */
+function getTelegramAgentByPhone($phone) {
+    if (!function_exists('getDBConnection')) {
+        return null;
+    }
+    
+    try {
+        $db = getDBConnection();
+        
+        // Try exact match first
+        $stmt = $db->prepare("SELECT * FROM agents WHERE telegram_chat_id = :chat_id LIMIT 1");
+        $stmt->execute([':chat_id' => $phone]);
+        $agent = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($agent) {
+            return $agent;
+        }
+        
+        // Try with phone number variants
+        $stmt = $db->prepare("SELECT * FROM agents WHERE phone = :phone LIMIT 1");
+        $stmt->execute([':phone' => $phone]);
+        $agent = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($agent) {
+            return $agent;
+        }
+        
+        // Try with different phone formats (remove leading 62, 0, +62)
+        $phoneVariants = [];
+        $phoneVariants[] = $phone;
+        
+        if (strpos($phone, '62') === 0) {
+            $phoneVariants[] = '0' . substr($phone, 2);
+        }
+        if (strpos($phone, '0') === 0) {
+            $phoneVariants[] = '62' . substr($phone, 1);
+        }
+        
+        foreach ($phoneVariants as $variant) {
+            $stmt = $db->prepare("SELECT * FROM agents WHERE phone = :phone LIMIT 1");
+            $stmt->execute([':phone' => $variant]);
+            $agent = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($agent) {
+                return $agent;
+            }
+        }
+        
+        return null;
+    } catch (Exception $e) {
+        error_log("Error getting Telegram agent by phone: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
  * Purchase/Generate voucher for Telegram
  */
 function purchaseTelegramVoucher($chatId, $profileName, $isAdmin) {
@@ -702,6 +1010,52 @@ function purchaseTelegramVoucher($chatId, $profileName, $isAdmin) {
     $price = $parts[2] ?? '0';
     $sprice = $parts[4] ?? '0';
     
+    // Set buy price for balance check
+    $buyPrice = (float)$sprice;
+    
+    // Initialize agent variables
+    $agent = null;
+    $agentId = null;
+    $balanceBefore = 0;
+    $balanceAfter = 0;
+    
+    // Check agent/admin authorization
+    if (!$isAdmin) {
+        // Get agent info
+        $agent = getTelegramAgentByPhone($chatId);
+        
+        if ($agent) {
+            $agentId = $agent['id'];
+            
+            // Validate price
+            if ($buyPrice <= 0) {
+                $API->disconnect();
+                sendTelegramMessage($chatId, "❌ *HARGA TIDAK VALID*\n\nHarga paket *$profileName* belum dikonfigurasi.\nHubungi administrator.");
+                return;
+            }
+            
+            // Check balance
+            if ($agent['balance'] < $buyPrice) {
+                $reply = "❌ *SALDO TIDAK CUKUP*\n\n";
+                $reply .= "Saldo Anda: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n";
+                $reply .= "Dibutuhkan: Rp " . number_format($buyPrice, 0, ',', '.') . "\n";
+                $reply .= "Kurang: Rp " . number_format($buyPrice - $agent['balance'], 0, ',', '.') . "\n\n";
+                $reply .= "Silakan topup saldo terlebih dahulu.";
+                $API->disconnect();
+                sendTelegramMessage($chatId, $reply);
+                return;
+            }
+        } else {
+            // Not an agent and not an admin - REJECT
+            $API->disconnect();
+            $errorMsg = "❌ *AKSES DITOLAK*\n\n";
+            $errorMsg .= "Chat ID Anda tidak terdaftar sebagai agent.\n\n";
+            $errorMsg .= "Untuk menjadi agent, silakan hubungi administrator.";
+            sendTelegramMessage($chatId, $errorMsg);
+            return;
+        }
+    }
+    
     // Generate username and password based on settings
     $credentials = generateTelegramVoucherCredentials();
     $username = $credentials['username'];
@@ -723,6 +1077,32 @@ function purchaseTelegramVoucher($chatId, $profileName, $isAdmin) {
         return;
     }
     
+    // Deduct balance for agent (only for non-admin)
+    if (!$isAdmin && $agent && $agentId) {
+        // Load Agent class if not already loaded
+        if (!class_exists('Agent')) {
+            require_once(__DIR__ . '/../lib/Agent.class.php');
+        }
+        
+        $agentClass = new Agent();
+        $deductResult = $agentClass->deductBalance(
+            $agentId,
+            $buyPrice,
+            $profileName,
+            $username,
+            'Voucher Telegram: ' . $profileName,
+            'voucher_telegram'
+        );
+        
+        if ($deductResult['success']) {
+            $balanceBefore = $deductResult['balance_before'];
+            $balanceAfter = $deductResult['balance_after'];
+        } else {
+            // Log error but don't fail the transaction (voucher already created)
+            error_log("Failed to deduct balance for Telegram agent $agentId: " . $deductResult['message']);
+        }
+    }
+    
     // Format price
     if (strpos($currency, 'Rp') !== false || strpos($currency, 'IDR') !== false) {
         $priceFormatted = $currency . " " . number_format((float)$sprice, 0, ",", ".");
@@ -739,6 +1119,12 @@ function purchaseTelegramVoucher($chatId, $profileName, $isAdmin) {
     $message .= "━━━━━━━━━━━━━━━━━━━━\n\n";
     $message .= "*Username:* `$username`\n";
     $message .= "*Password:* `$password`\n\n";
+    
+    // Show balance for agent (not for admin)
+    if (!$isAdmin && $balanceAfter > 0) {
+        $message .= "💳 Saldo Anda: Rp " . number_format($balanceAfter, 0, ',', '.') . "\n\n";
+    }
+    
     $message .= "━━━━━━━━━━━━━━━━━━━━\n";
     $message .= "Login: http://$dnsname/login\n";
     $message .= "Hotspot: *$hotspotname*";
@@ -754,6 +1140,457 @@ function purchaseTelegramVoucher($chatId, $profileName, $isAdmin) {
         }
     } catch (Exception $e) {
         // Ignore logging errors
+    }
+}
+
+/**
+ * Show admin main menu
+ */
+function showTelegramAdminMenu($chatId) {
+    try {
+        $message = "⚙️ *ADMIN CONTROL PANEL*\n\nPilih menu:";
+        
+        $keyboard = [
+            [
+                ['text' => '🎫 Voucher', 'callback_data' => 'admin_voucher'],
+                ['text' => '🌐 PPPoE', 'callback_data' => 'admin_pppoe']
+            ],
+            [
+                ['text' => '⚙️ Settings', 'callback_data' => 'admin_settings'],
+                ['text' => '❓ Help', 'callback_data' => 'admin_help']
+            ]
+        ];
+        
+        // Add text alternative
+        $message .= "\n\n📝 *Atau gunakan perintah text:*\n";
+        $message .= "• HARGA - Lihat paket\n";
+        $message .= "• PPP - Status PPPoE\n";
+        $message .= "• PING - Test koneksi\n";
+        $message .= "• RESOURCE - Info server";
+        
+        // Send with keyboard, fallback to text if failed
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            $result = sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+            if (!$result['success']) {
+                sendTelegramMessage($chatId, $message);
+            }
+        } else {
+            sendTelegramMessage($chatId, $message);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAdminMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nSilakan gunakan perintah text: HARGA, PPP, PING");
+    }
+}
+
+/**
+ * Show admin voucher submenu (using cache system)
+ */
+function showTelegramAdminVoucherMenu($chatId) {
+    try {
+        // Try to get cached packages first
+        $packages = getTelegramCachedPackages();
+        
+        if (empty($packages)) {
+            // Fallback to loading message
+            sendTelegramMessage($chatId, "⏳ Mengambil data paket...");
+            $packages = getTelegramCachedPackages(true); // Force refresh
+        }
+        
+        if (empty($packages)) {
+            sendTelegramMessage($chatId, "❌ Tidak ada paket tersedia.\n\nGunakan perintah: HARGA");
+            return;
+        }
+        
+        $message = "🎫 *ADMIN VOUCHER MENU*\n\nPilih paket untuk generate voucher:";
+        
+        // Take first 5 packages (sorted by price)
+        $keyboard = [];
+        $count = 0;
+        foreach ($packages as $package) {
+            if ($count >= 5) break; // Limit to 5 packages for admin
+            
+            $keyboard[] = [['text' => $package['display'], 'callback_data' => 'admin_buy:' . $package['name']]];
+            $count++;
+        }
+        
+        // Add navigation buttons
+        $keyboard[] = [['text' => '📋 Lihat Semua Paket', 'callback_data' => 'admin_all_packages']];
+        $keyboard[] = [['text' => '🔙 Back to Main', 'callback_data' => 'admin_main']];
+        
+        // Add text alternative
+        $message .= "\n\n📝 *Atau gunakan perintah text:*\n";
+        $message .= "• VOUCHER [nama_paket]\n";
+        $message .= "• HARGA - Lihat semua paket";
+        
+        // Send response
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+        } else {
+            sendTelegramMessage($chatId, $message);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAdminVoucherMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nSilakan gunakan perintah: HARGA");
+    }
+}
+
+/**
+ * Show admin PPPoE submenu
+ */
+function showTelegramAdminPPPoEMenu($chatId) {
+    try {
+        $message = "🌐 *PPPoE MANAGEMENT*\n\nPilih menu:";
+        
+        $keyboard = [
+            [
+                ['text' => '📊 PPP Aktif', 'callback_data' => 'admin_ppp_active'],
+                ['text' => '💤 PPP Offline', 'callback_data' => 'admin_ppp_offline']
+            ],
+            [
+                ['text' => '✏️ PPP Edit', 'callback_data' => 'admin_ppp_edit'],
+                ['text' => '🔧 PPP Tools', 'callback_data' => 'admin_ppp_tools']
+            ],
+            [
+                ['text' => '🔙 Back to Main', 'callback_data' => 'admin_main']
+            ]
+        ];
+        
+        // Add text alternative
+        $message .= "\n\n📝 *Atau gunakan perintah text:*\n";
+        $message .= "• PPP - Status aktif\n";
+        $message .= "• PPP OFFLINE - Status offline\n";
+        $message .= "• EDIT [nama] [profile] - Edit PPPoE";
+        
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            $result = sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+            if (!$result['success']) {
+                sendTelegramMessage($chatId, $message);
+            }
+        } else {
+            sendTelegramMessage($chatId, $message);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAdminPPPoEMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nSilakan gunakan perintah: PPP");
+    }
+}
+
+/**
+ * Show admin settings submenu
+ */
+function showTelegramAdminSettingsMenu($chatId) {
+    try {
+        $message = "⚙️ *SYSTEM SETTINGS*\n\nPilih menu:";
+        
+        $keyboard = [
+            [
+                ['text' => '🏓 Ping Test', 'callback_data' => 'admin_ping'],
+                ['text' => '📊 Resource', 'callback_data' => 'admin_resource']
+            ],
+            [
+                ['text' => '🔄 Reboot', 'callback_data' => 'admin_reboot'],
+                ['text' => '📋 Info', 'callback_data' => 'admin_info']
+            ],
+            [
+                ['text' => '🔙 Back to Main', 'callback_data' => 'admin_main']
+            ]
+        ];
+        
+        // Add text alternative
+        $message .= "\n\n📝 *Atau gunakan perintah text:*\n";
+        $message .= "• PING - Test koneksi\n";
+        $message .= "• RESOURCE - Info server\n";
+        $message .= "• INFO - System info";
+        
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            $result = sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+            if (!$result['success']) {
+                sendTelegramMessage($chatId, $message);
+            }
+        } else {
+            sendTelegramMessage($chatId, $message);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAdminSettingsMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nSilakan gunakan perintah: PING, RESOURCE");
+    }
+}
+
+/**
+ * Get cached packages or load from MikroTik
+ */
+function getTelegramCachedPackages($forceRefresh = false) {
+    $cacheFile = __DIR__ . '/../cache/telegram_packages.json';
+    $cacheDir = dirname($cacheFile);
+    
+    // Create cache directory if not exists
+    if (!file_exists($cacheDir)) {
+        mkdir($cacheDir, 0755, true);
+    }
+    
+    // Check cache validity (5 minutes)
+    $cacheValid = false;
+    if (!$forceRefresh && file_exists($cacheFile)) {
+        $cacheTime = filemtime($cacheFile);
+        $cacheValid = (time() - $cacheTime) < 300; // 5 minutes
+    }
+    
+    if ($cacheValid) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        if ($cached && isset($cached['packages'])) {
+            return $cached['packages'];
+        }
+    }
+    
+    // Load fresh data from MikroTik
+    try {
+        global $data;
+        if (!isset($data) || empty($data)) {
+            require_once(__DIR__ . '/../include/config.php');
+        }
+        $sessionConfig = isset($data) ? $data : array();
+        
+        if (empty($sessionConfig)) {
+            return [];
+        }
+        
+        // Get first session
+        $sessions = array_keys($sessionConfig);
+        $session = null;
+        foreach ($sessions as $s) {
+            if ($s != 'mikhmon') {
+                $session = $s;
+                break;
+            }
+        }
+        
+        if (!$session || !isset($sessionConfig[$session])) {
+            return [];
+        }
+        
+        // Load session config
+        $data = $sessionConfig[$session];
+        $iphost = explode('!', $data[1])[1] ?? '';
+        $userhost = explode('@|@', $data[2])[1] ?? '';
+        $passwdhost = explode('#|#', $data[3])[1] ?? '';
+        $currency = explode('&', $data[6])[1] ?? 'Rp';
+        
+        if (empty($iphost) || empty($userhost) || empty($passwdhost)) {
+            return [];
+        }
+        
+        // Connect to MikroTik
+        require_once(__DIR__ . '/../lib/routeros_api.class.php');
+        
+        $API = new RouterosAPI();
+        $API->debug = false;
+        
+        if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
+            $API->disconnect();
+            return [];
+        }
+        
+        // Get profiles
+        $profiles = $API->comm("/ip/hotspot/user/profile/print");
+        $API->disconnect();
+        
+        if (empty($profiles)) {
+            return [];
+        }
+        
+        // Process profiles
+        $packages = [];
+        foreach ($profiles as $profile) {
+            $profileName = $profile['name'] ?? '';
+            $ponlogin = $profile['on-login'] ?? '';
+            
+            if (empty($ponlogin) || $profileName === 'default') {
+                continue;
+            }
+            
+            $parts = explode(",", $ponlogin);
+            $validity = $parts[3] ?? '';
+            $sprice = $parts[4] ?? '0';
+            
+            if (empty($validity) || $sprice <= 0) {
+                continue;
+            }
+            
+            // Format price
+            if (strpos($currency, 'Rp') !== false || strpos($currency, 'IDR') !== false) {
+                $priceFormatted = $currency . " " . number_format((float)$sprice, 0, ",", ".");
+            } else {
+                $priceFormatted = $currency . " " . number_format((float)$sprice, 2);
+            }
+            
+            $packages[] = [
+                'name' => $profileName,
+                'validity' => $validity,
+                'price' => (float)$sprice,
+                'price_formatted' => $priceFormatted,
+                'display' => $profileName . " - " . $priceFormatted
+            ];
+        }
+        
+        // Sort by price (cheapest first)
+        usort($packages, function($a, $b) {
+            return $a['price'] <=> $b['price'];
+        });
+        
+        // Cache the result
+        $cacheData = [
+            'timestamp' => time(),
+            'packages' => $packages
+        ];
+        file_put_contents($cacheFile, json_encode($cacheData));
+        
+        return $packages;
+        
+    } catch (Exception $e) {
+        error_log("Error loading packages cache: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Show agent quick buy menu (popular packages only)
+ */
+function showTelegramAgentQuickMenu($chatId) {
+    try {
+        // Try to get cached packages first
+        $packages = getTelegramCachedPackages();
+        
+        if (empty($packages)) {
+            // Fallback to loading message
+            sendTelegramMessage($chatId, "⏳ Mengambil data paket...");
+            $packages = getTelegramCachedPackages(true); // Force refresh
+        }
+        
+        if (empty($packages)) {
+            sendTelegramMessage($chatId, "❌ Tidak ada paket tersedia.\n\nGunakan perintah: HARGA");
+            return;
+        }
+        
+        $message = "⚡ *QUICK BUY*\n\nPaket populer (langsung beli):";
+        
+        // Take first 4 packages (sorted by price)
+        $keyboard = [];
+        $count = 0;
+        foreach ($packages as $package) {
+            if ($count >= 4) break; // Limit to 4 popular packages
+            
+            $keyboard[] = [['text' => $package['display'], 'callback_data' => 'agent_buy:' . $package['name']]];
+            $count++;
+        }
+        
+        // Add navigation buttons
+        $keyboard[] = [['text' => '📋 Lihat Semua Paket', 'callback_data' => 'agent_packages']];
+        $keyboard[] = [['text' => '🔙 Kembali', 'callback_data' => 'agent_menu']];
+        
+        // Send response
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+        } else {
+            sendTelegramMessage($chatId, $message . "\n\nGunakan: VOUCHER [nama_paket]");
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAgentQuickMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan: VOUCHER [nama_paket]");
+    }
+}
+
+/**
+ * Show all agent packages (using cache system)
+ */
+function showTelegramAgentPackagesMenu($chatId) {
+    try {
+        // Check if user is agent
+        $agent = getTelegramAgentByPhone($chatId);
+        if (!$agent) {
+            sendTelegramMessage($chatId, "❌ *AKSES DITOLAK*\n\nAnda tidak terdaftar sebagai agent.");
+            return;
+        }
+        
+        // Get packages from cache (force refresh for complete list)
+        $packages = getTelegramCachedPackages(true);
+        
+        if (empty($packages)) {
+            sendTelegramMessage($chatId, "❌ Tidak ada paket tersedia.\n\nGunakan perintah: HARGA");
+            return;
+        }
+        
+        // Build message and keyboard
+        $message = "📋 *SEMUA PAKET TERSEDIA*\n\n";
+        $message .= "💰 Saldo: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n\n";
+        
+        $keyboard = [];
+        
+        foreach ($packages as $package) {
+            $keyboard[] = [['text' => $package['display'], 'callback_data' => 'agent_buy:' . $package['name']]];
+        }
+        
+        // Add navigation buttons
+        $keyboard[] = [['text' => '🔙 Kembali', 'callback_data' => 'agent_menu']];
+        
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+        } else {
+            sendTelegramMessage($chatId, $message . "\n\nGunakan: VOUCHER [nama_paket]");
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAgentPackagesMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nGunakan perintah: HARGA");
+    }
+}
+
+/**
+ * Show agent menu with package selection
+ */
+function showTelegramAgentMenu($chatId) {
+    try {
+        // Quick check if user is agent (no heavy operations)
+        $agent = getTelegramAgentByPhone($chatId);
+        if (!$agent) {
+            sendTelegramMessage($chatId, "❌ *AKSES DITOLAK*\n\nAnda tidak terdaftar sebagai agent.\nSilakan hubungi administrator.");
+            return;
+        }
+        
+        // INSTANT RESPONSE - Lightweight menu without MikroTik data
+        $message = "🎫 *AGENT MENU*\n\n";
+        $message .= "💰 Saldo Anda: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n\n";
+        $message .= "Pilih aksi:";
+        
+        $keyboard = [
+            [['text' => '⚡ Quick Buy', 'callback_data' => 'agent_quick']],
+            [['text' => '📋 Lihat Semua Paket', 'callback_data' => 'agent_packages']],
+            [['text' => 'ℹ️ Info Saldo', 'callback_data' => 'agent_balance']]
+        ];
+        
+        // Add text alternative
+        $message .= "\n\n📝 *Atau gunakan perintah text:*\n";
+        $message .= "• VOUCHER [nama_paket] - Beli langsung\n";
+        $message .= "• HARGA - Lihat semua paket";
+        
+        // INSTANT send - no heavy operations
+        if (function_exists('sendTelegramMessageWithKeyboard')) {
+            $result = sendTelegramMessageWithKeyboard($chatId, $message, $keyboard);
+            if (!$result['success']) {
+                sendTelegramMessage($chatId, $message);
+            }
+        } else {
+            sendTelegramMessage($chatId, $message);
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error in showTelegramAgentMenu: " . $e->getMessage());
+        sendTelegramMessage($chatId, "❌ Terjadi kesalahan.\n\nSilakan gunakan perintah: HARGA");
     }
 }
 

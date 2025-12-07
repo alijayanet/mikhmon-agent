@@ -833,49 +833,6 @@ function generateRandomString($type, $length) {
     return $result;
 }
 
-/**
- * Generate Voucher Credentials based on Settings
- */
-function generateTelegramVoucherCredentials() {
-    $settings = getVoucherSettings();
-    
-    // Settings
-    $usernameType = $settings['voucher_username_type'];
-    $usernameLength = intval($settings['voucher_username_length']);
-    $passwordType = $settings['voucher_password_type'];
-    $passwordLength = intval($settings['voucher_password_length']);
-    $prefixEnabled = $settings['voucher_prefix_enabled'] == '1';
-    $prefix = $settings['voucher_prefix'];
-    $uppercase = $settings['voucher_uppercase'] == '1';
-    $samePassword = $settings['voucher_username_password_same'] == '1';
-    
-    // Generate Username
-    $username = generateRandomString($usernameType, $usernameLength);
-    
-    if ($prefixEnabled && !empty($prefix)) {
-        $username = $prefix . $username;
-    }
-    
-    if (!$uppercase && $usernameType !== 'numeric') {
-        $username = strtolower($username);
-    }
-    
-    // Generate Password
-    $password = '';
-    if ($samePassword) {
-        $password = $username;
-    } else {
-        $password = generateRandomString($passwordType, $passwordLength);
-        if (!$uppercase && $passwordType !== 'numeric') {
-            $password = strtolower($password);
-        }
-    }
-    
-    return [
-        'username' => $username,
-        'password' => $password
-    ];
-}
 
 /**
  * Enable Hotspot User
