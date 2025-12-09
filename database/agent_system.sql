@@ -9,11 +9,8 @@ CREATE TABLE IF NOT EXISTS agents (
     id INT AUTO_INCREMENT PRIMARY KEY,
     agent_code VARCHAR(20) UNIQUE NOT NULL,
     agent_name VARCHAR(100) NOT NULL,
-    email VARCHAR(100),
     phone VARCHAR(20) UNIQUE NOT NULL,
-    telegram_chat_id VARCHAR(50) DEFAULT NULL,
-    telegram_username VARCHAR(100) DEFAULT NULL,
-    preferred_channel ENUM('whatsapp', 'telegram', 'both') DEFAULT 'whatsapp',
+    email VARCHAR(100),
     password VARCHAR(255) NOT NULL,
     balance DECIMAL(15,2) DEFAULT 0.00,
     status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
@@ -194,57 +191,56 @@ CREATE TABLE IF NOT EXISTS digiflazz_transactions (
 -- Pengaturan sistem agent
 CREATE TABLE IF NOT EXISTS agent_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    agent_id INT NOT NULL DEFAULT 1,
     setting_key VARCHAR(100) UNIQUE NOT NULL,
     setting_value TEXT,
     setting_type VARCHAR(20) DEFAULT 'string',
     description TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by VARCHAR(50),
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
-    INDEX idx_agent_id (agent_id)
+    updated_by VARCHAR(50)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Table: pppoe_notification_settings
--- Stores PPPoE login/logout notification settings for agents
-CREATE TABLE IF NOT EXISTS pppoe_notification_settings (
+-- Table: payment_methods
+-- Metode pembayaran untuk transaksi
+CREATE TABLE IF NOT EXISTS payment_methods (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    agent_id INT NOT NULL,
-    enabled BOOLEAN DEFAULT FALSE,
-    notify_on_login BOOLEAN DEFAULT TRUE,
-    notify_on_logout BOOLEAN DEFAULT TRUE,
-    notification_message_template TEXT,
+    gateway_name VARCHAR(50) NOT NULL,
+    method_code VARCHAR(50) NOT NULL,
+    method_name VARCHAR(100) NOT NULL,
+    method_type VARCHAR(20) NOT NULL,
+    name VARCHAR(100) NOT NULL DEFAULT '',
+    type VARCHAR(50) NOT NULL DEFAULT '',
+    display_name VARCHAR(100) NOT NULL DEFAULT '',
+    icon VARCHAR(100) DEFAULT NULL,
+    icon_url VARCHAR(255) DEFAULT NULL,
+    admin_fee_type ENUM('percentage','fixed','flat','percent') DEFAULT 'fixed',
+    admin_fee_value DECIMAL(10,2) DEFAULT 0.00,
+    min_amount DECIMAL(10,2) DEFAULT 0.00,
+    max_amount DECIMAL(12,2) DEFAULT 999999999.99,
+    is_active TINYINT(1) DEFAULT 1,
+    sort_order INT DEFAULT 0,
+    config TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_agent_settings (agent_id)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Insert default settings for existing agents
-INSERT INTO pppoe_notification_settings (agent_id, enabled, notify_on_login, notify_on_logout)
-SELECT id, FALSE, TRUE, TRUE 
-FROM agents 
-WHERE id NOT IN (SELECT agent_id FROM pppoe_notification_settings)
-ON DUPLICATE KEY UPDATE agent_id=agent_id;
 
 -- Insert default settings
-INSERT INTO agent_settings (agent_id, setting_key, setting_value, setting_type, description) VALUES
-(1, 'min_topup_amount', '50000', 'number', 'Minimum amount untuk topup saldo'),
-(1, 'max_topup_amount', '10000000', 'number', 'Maximum amount untuk topup saldo'),
-(1, 'auto_approve_topup', '0', 'boolean', 'Auto approve topup request'),
-(1, 'commission_enabled', '1', 'boolean', 'Enable commission system'),
-(1, 'default_commission_percent', '5', 'number', 'Default commission percentage'),
-(1, 'agent_registration_enabled', '1', 'boolean', 'Allow agent self registration'),
-(1, 'min_balance_alert', '10000', 'number', 'Alert when balance below this amount'),
-(1, 'whatsapp_notification_enabled', '1', 'boolean', 'Send WhatsApp notification to agents'),
-(1, 'agent_can_set_sell_price', '1', 'boolean', 'Allow agent to set their own sell price'),
-(1, 'voucher_prefix_agent', 'AG', 'string', 'Prefix for agent generated vouchers'),
-(1, 'digiflazz_enabled', '0', 'boolean', 'Enable Digiflazz integration'),
-(1, 'digiflazz_username', '', 'string', 'Digiflazz buyer username'),
-(1, 'digiflazz_api_key', '', 'string', 'Digiflazz API key'),
-(1, 'digiflazz_allow_test', '1', 'boolean', 'Allow Digiflazz testing mode'),
-(1, 'digiflazz_default_markup_percent', '5', 'number', 'Default markup percent for Digiflazz products'),
-(1, 'digiflazz_last_sync', NULL, 'datetime', 'Last price list sync timestamp')
+INSERT INTO agent_settings (setting_key, setting_value, setting_type, description) VALUES
+('min_topup_amount', '50000', 'number', 'Minimum amount untuk topup saldo'),
+('max_topup_amount', '10000000', 'number', 'Maximum amount untuk topup saldo'),
+('auto_approve_topup', '0', 'boolean', 'Auto approve topup request'),
+('commission_enabled', '1', 'boolean', 'Enable commission system'),
+('default_commission_percent', '5', 'number', 'Default commission percentage'),
+('agent_registration_enabled', '1', 'boolean', 'Allow agent self registration'),
+('min_balance_alert', '10000', 'number', 'Alert when balance below this amount'),
+('whatsapp_notification_enabled', '1', 'boolean', 'Send WhatsApp notification to agents'),
+('agent_can_set_sell_price', '1', 'boolean', 'Allow agent to set their own sell price'),
+('voucher_prefix_agent', 'AG', 'string', 'Prefix for agent generated vouchers'),
+('digiflazz_enabled', '0', 'boolean', 'Enable Digiflazz integration'),
+('digiflazz_username', '', 'string', 'Digiflazz buyer username'),
+('digiflazz_api_key', '', 'string', 'Digiflazz API key'),
+('digiflazz_allow_test', '1', 'boolean', 'Allow Digiflazz testing mode'),
+('digiflazz_default_markup_percent', '5', 'number', 'Default markup percent for Digiflazz products'),
+('digiflazz_last_sync', NULL, 'datetime', 'Last price list sync timestamp')
 ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);
 
 -- Insert default payment methods

@@ -21,14 +21,14 @@ CREATE TABLE IF NOT EXISTS payment_records (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Insert payment gateway settings
-INSERT INTO agent_settings (agent_id, setting_key, setting_value, setting_type, description, updated_by) VALUES
-(1, 'payment_enabled', '0', 'boolean', 'Enable payment gateway integration', 'system'),
-(1, 'payment_gateway', 'midtrans', 'string', 'Active payment gateway: midtrans or xendit', 'system'),
-(1, 'payment_midtrans_server_key', '', 'string', 'Midtrans server key', 'system'),
-(1, 'payment_midtrans_client_key', '', 'string', 'Midtrans client key', 'system'),
-(1, 'payment_midtrans_environment', 'sandbox', 'string', 'Midtrans environment: sandbox or production', 'system'),
-(1, 'payment_xendit_api_key', '', 'string', 'Xendit API key', 'system'),
-(1, 'payment_xendit_callback_token', '', 'string', 'Xendit callback verification token', 'system')
+INSERT INTO agent_settings (setting_key, setting_value, setting_type, description, updated_by) VALUES
+('payment_enabled', '0', 'boolean', 'Enable payment gateway integration', 'system'),
+('payment_gateway', 'midtrans', 'string', 'Active payment gateway: midtrans or xendit', 'system'),
+('payment_midtrans_server_key', '', 'string', 'Midtrans server key', 'system'),
+('payment_midtrans_client_key', '', 'string', 'Midtrans client key', 'system'),
+('payment_midtrans_environment', 'sandbox', 'string', 'Midtrans environment: sandbox or production', 'system'),
+('payment_xendit_api_key', '', 'string', 'Xendit API key', 'system'),
+('payment_xendit_callback_token', '', 'string', 'Xendit callback verification token', 'system')
 ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);
 
 -- ========================================
