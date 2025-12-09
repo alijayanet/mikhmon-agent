@@ -207,7 +207,7 @@ if (!isset($_SESSION["mikhmon"])) {
     $ssecrets = "active";
     $mpage = $_ppp_secrets;
     $pppmenu = "menu-open";
-  } elseif ($ppp == "profiles" || $removepprofile != "" || $ppp == "add-profile" || $ppp == "edit-profile"  ) {
+  } elseif ($ppp == "profiles" || $removepprofile != "" || $ppp == "add-profile" || substr($ppp, 0, 12) == "edit-profile"  ) {
     $mppp = "active";
     $spprofile = "active";
     $mpage = $_ppp_profiles;
