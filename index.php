@@ -368,6 +368,11 @@ elseif ($removeexpiredhotspotuser != "") {
     include_once('./settings/whatsapp_settings.php');
   }
 
+// whatsapp gateway admin
+  elseif ($hotspot == "whatsapp-gateway") {
+    include_once('./settings/whatsapp_gateway_admin.php');
+  }
+
 // agent management
   elseif ($hotspot == "agent-setup") {
     try {
@@ -766,8 +771,8 @@ elseif ($report == "export") {
     include_once('./ppp/addpppprofile.php');
   }
 
-// add ppp profile
-elseif ($ppp == "edit-profile") {
+// edit ppp profile
+elseif (substr($ppp, 0, 12) == "edit-profile") {
   include_once('./ppp/profilebyname.php');
 }
 // remove enable disable profile
