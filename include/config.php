@@ -2,6 +2,6 @@
 if(substr($_SERVER["REQUEST_URI"], -10) == "config.php"){header("Location:./");}; 
 $data['mikhmon'] = array ('1'=>'mikhmon<|<alijaya','mikhmon>|>aGdiaWJj');
 
-$data['ALIJAYA-NET'] = array ('1'=>'ALIJAYA-NET!192.168.8.1:8728','ALIJAYA-NET@|@admin','ALIJAYA-NET#|#mZWfoZ8=','ALIJAYA-NET%ALIJAYA-NET','ALIJAYA-NET^alijayanet.login','ALIJAYA-NET&Rp','ALIJAYA-NET*10','ALIJAYA-NET(1','ALIJAYA-NET)','ALIJAYA-NET=10','ALIJAYA-NET@!@enable');
+$data['ALIJAYA-NET'] = array ('1'=>'ALIJAYA-NET!192.168.8.1:8700','ALIJAYA-NET@|@alijaya','ALIJAYA-NET#|#aGdiaWJj','ALIJAYA-NET%ALIJAYA-NET','ALIJAYA-NET^alijayanet.login','ALIJAYA-NET&Rp','ALIJAYA-NET*10','ALIJAYA-NET(1','ALIJAYA-NET)','ALIJAYA-NET=10','ALIJAYA-NET@!@enable');
 
 

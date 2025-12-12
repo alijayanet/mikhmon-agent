@@ -43,6 +43,25 @@ class Agent {
             if ($this->hasCommissionAmountColumn) {
                 $fields['commission_amount'] = ':commission_amount';
             }
+            
+            // Add Telegram fields if they exist
+            try {
+                $stmt = $this->db->query("SHOW COLUMNS FROM agents LIKE 'telegram_chat_id'");
+                if ($stmt->rowCount() > 0) {
+                    $fields['telegram_chat_id'] = ':telegram_chat_id';
+                }
+            } catch (Exception $e) {
+                // Column doesn't exist, skip
+            }
+            
+            try {
+                $stmt = $this->db->query("SHOW COLUMNS FROM agents LIKE 'telegram_username'");
+                if ($stmt->rowCount() > 0) {
+                    $fields['telegram_username'] = ':telegram_username';
+                }
+            } catch (Exception $e) {
+                // Column doesn't exist, skip
+            }
 
             $columns = implode(', ', array_keys($fields));
             $placeholders = implode(', ', array_values($fields));
@@ -65,6 +84,14 @@ class Agent {
 
             if ($this->hasCommissionAmountColumn) {
                 $params[':commission_amount'] = $data['commission_amount'] ?? 0;
+            }
+            
+            // Add Telegram parameters only if fields exist
+            if (isset($fields['telegram_chat_id'])) {
+                $params[':telegram_chat_id'] = $data['telegram_chat_id'] ?? null;
+            }
+            if (isset($fields['telegram_username'])) {
+                $params[':telegram_username'] = $data['telegram_username'] ?? null;
             }
 
             $stmt->execute($params);
@@ -122,6 +149,17 @@ class Agent {
         $stmt->execute([':code' => $code]);
         return $stmt->fetch();
     }
+    
+    /**
+     * Get agent by Telegram Chat ID
+     */
+    public function getAgentByTelegramChatId($chatId) {
+        $sql = "SELECT * FROM agents WHERE telegram_chat_id = :chat_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':chat_id' => $chatId]);
+        return $stmt->fetch();
+    }
+    
     
     /**
      * Get all agents
