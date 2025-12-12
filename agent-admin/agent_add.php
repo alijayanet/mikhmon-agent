@@ -11,6 +11,7 @@ include_once('./include/db_config.php');
 include_once('./lib/Agent.class.php');
 
 $agent = new Agent();
+
 $error = '';
 $success = '';
 
@@ -28,6 +29,8 @@ if (isset($_POST['add_agent'])) {
     $level = $_POST['level'];
     $commissionAmount = floatval($_POST['commission_amount']);
     $notes = trim($_POST['notes']);
+    $telegramChatId = trim($_POST['telegram_chat_id']);
+    $telegramUsername = trim($_POST['telegram_username']);
     
     // Validation
     if (empty($agentName) || empty($phone) || empty($password)) {
@@ -38,28 +41,40 @@ if (isset($_POST['add_agent'])) {
         if ($existingAgent) {
             $error = 'Nomor WhatsApp sudah terdaftar!';
         } else {
-            $data = [
-                'agent_code' => $agentCode,
-                'agent_name' => $agentName,
-                'phone' => $phone,
-                'email' => $email,
-                'password' => $password,
-                'balance' => $balance,
-                'status' => 'active',
-                'level' => $level,
-                'commission_amount' => $commissionAmount,
-                'created_by' => $_SESSION['mikhmon'],
-                'notes' => $notes
-            ];
+            // Check if telegram_chat_id already exists (if provided)
+            if (!empty($telegramChatId)) {
+                $existingTelegram = $agent->getAgentByTelegramChatId($telegramChatId);
+                if ($existingTelegram) {
+                    $error = 'User ID Telegram sudah terdaftar untuk agent lain!';
+                }
+            }
             
-            $result = $agent->createAgent($data);
+            if (empty($error)) {
+                $data = [
+                    'agent_code' => $agentCode,
+                    'agent_name' => $agentName,
+                    'phone' => $phone,
+                    'email' => $email,
+                    'password' => $password,
+                    'balance' => $balance,
+                    'status' => 'active',
+                    'level' => $level,
+                    'commission_amount' => $commissionAmount,
+                    'created_by' => $_SESSION['mikhmon'],
+                    'notes' => $notes,
+                    'telegram_chat_id' => $telegramChatId,
+                    'telegram_username' => $telegramUsername
+                ];
             
-            if ($result['success']) {
-                $success = 'Agent berhasil ditambahkan! Kode Agent: ' . $agentCode;
-                // Clear form
-                $_POST = array();
-            } else {
-                $error = $result['message'];
+                $result = $agent->createAgent($data);
+                
+                if ($result['success']) {
+                    $success = 'Agent berhasil ditambahkan! Kode Agent: ' . $agentCode;
+                    // Clear form
+                    $_POST = array();
+                } else {
+                    $error = $result['message'];
+                }
             }
         }
     }
@@ -137,6 +152,8 @@ if (isset($_POST['add_agent'])) {
             <li>Nomor WhatsApp akan digunakan untuk login</li>
             <li>Password minimal 6 karakter</li>
             <li>Saldo awal bisa diisi 0 dan ditopup kemudian</li>
+            <li><strong>User ID Telegram:</strong> Minta agent kirim pesan ke bot Telegram, lalu ambil Chat ID dari log webhook</li>
+            <li><strong>Username Telegram:</strong> Username Telegram agent (opsional, untuk identifikasi)</li>
         </ul>
     </div>
 
@@ -175,6 +192,24 @@ if (isset($_POST['add_agent'])) {
                         <label>Password <span class="required">*</span></label>
                         <input type="password" name="password" class="form-control" 
                                placeholder="Minimal 6 karakter" minlength="6" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>User ID Telegram</label>
+                        <input type="text" name="telegram_chat_id" class="form-control" 
+                               value="<?= htmlspecialchars($_POST['telegram_chat_id'] ?? ''); ?>" 
+                               placeholder="123456789">
+                        <small style="color: #666;">Chat ID Telegram agent (opsional)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Username Telegram</label>
+                        <input type="text" name="telegram_username" class="form-control" 
+                               value="<?= htmlspecialchars($_POST['telegram_username'] ?? ''); ?>" 
+                               placeholder="@username">
+                        <small style="color: #666;">Username Telegram agent (opsional)</small>
                     </div>
                 </div>
             </div>
@@ -247,6 +282,21 @@ document.querySelector('input[name="phone"]').addEventListener('input', function
     e.target.value = value;
 });
 
+// Format Telegram Chat ID (only numbers)
+document.querySelector('input[name="telegram_chat_id"]').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    e.target.value = value;
+});
+
+// Format Telegram Username (add @ if not present)
+document.querySelector('input[name="telegram_username"]').addEventListener('input', function(e) {
+    let value = e.target.value.trim();
+    if (value && !value.startsWith('@')) {
+        value = '@' + value;
+    }
+    e.target.value = value;
+});
+
 // Generate strong password
 function generatePassword() {
     const length = 8;
@@ -257,4 +307,23 @@ function generatePassword() {
     }
     document.querySelector('input[name="password"]').value = password;
 }
+
+// Show info about getting Telegram Chat ID
+function showTelegramInfo() {
+    alert('Cara mendapatkan User ID Telegram:\n\n1. Minta agent kirim pesan "/start" ke bot Telegram\n2. Cek log webhook atau database telegram_webhook_log\n3. Ambil chat_id dari log tersebut\n4. Masukkan chat_id ke field User ID Telegram');
+}
+
+// Add info button next to Telegram Chat ID field
+document.addEventListener('DOMContentLoaded', function() {
+    const telegramField = document.querySelector('input[name="telegram_chat_id"]');
+    if (telegramField) {
+        const infoBtn = document.createElement('button');
+        infoBtn.type = 'button';
+        infoBtn.className = 'btn btn-sm';
+        infoBtn.innerHTML = '<i class="fa fa-info-circle"></i> Info';
+        infoBtn.onclick = showTelegramInfo;
+        infoBtn.style.marginLeft = '10px';
+        telegramField.parentNode.appendChild(infoBtn);
+    }
+});
 </script>

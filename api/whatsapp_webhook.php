@@ -372,6 +372,43 @@ function processCommand($phone, $message) {
         sendHelp($phone);
         return; // Valid command processed
     }
+    // Command: TAGIHAN <NAMA/HP> - Cek tagihan pelanggan
+    // Example: TAGIHAN 081234567890, TAGIHAN John Doe
+    elseif (strpos($messageLower, 'tagihan ') === 0) {
+        $customerIdentifier = trim(str_replace('tagihan ', '', $messageTrimmed));
+        if (!empty($customerIdentifier)) {
+            checkWhatsAppCustomerBills($phone, $customerIdentifier);
+        } else {
+            sendWhatsAppMessage($phone, "❌ Format salah!\n\n*Format TAGIHAN:*\n• TAGIHAN <NAMA/HP>\n\n*Contoh:*\n• TAGIHAN 081234567890\n• TAGIHAN John Doe");
+        }
+        return; // Valid command processed
+    }
+    // Command: BAYAR <NAMA/HP> [PERIODE] - Bayar tagihan pelanggan
+    // Example: BAYAR 081234567890, BAYAR John Doe 2025-12
+    elseif (strpos($messageLower, 'bayar ') === 0) {
+        $rest = trim(str_replace('bayar ', '', $messageTrimmed));
+        $parts = preg_split('/\s+/', $rest, 2);
+        $customerIdentifier = $parts[0] ?? '';
+        $period = $parts[1] ?? date('Y-m'); // Default current month
+        
+        if (!empty($customerIdentifier)) {
+            processWhatsAppBillPayment($phone, $customerIdentifier, $period);
+        } else {
+            sendWhatsAppMessage($phone, "❌ Format salah!\n\n*Format BAYAR:*\n• BAYAR <NAMA/HP> [PERIODE]\n\n*Contoh:*\n• BAYAR 081234567890\n• BAYAR John Doe 2025-12");
+        }
+        return; // Valid command processed
+    }
+    // Command: REG <NOMOR_HP> - Registrasi nomor agent dengan WhatsApp
+    // Example: REG 081234567890
+    elseif (strpos($messageLower, 'reg ') === 0) {
+        $phoneNumber = trim(str_replace('reg ', '', $messageTrimmed));
+        if (!empty($phoneNumber)) {
+            processWhatsAppAgentRegistration($phone, $phoneNumber);
+        } else {
+            sendWhatsAppMessage($phone, "❌ Format salah!\n\n*Format REG:*\n• REG <NOMOR_HP>\n\n*Contoh:*\n• REG 081234567890\n\n*Fungsi:* Menghubungkan akun WhatsApp Anda dengan nomor HP agent yang sudah terdaftar.");
+        }
+        return; // Valid command processed
+    }
     // Command: PULSA <SKU> <NOMER> - Beli produk Digiflazz (pulsa, data, e-money, games)
     // Example: PULSA as10 081234567890, PULSA xl5 087828060222
     elseif (strpos($messageLower, 'pulsa ') === 0) {
@@ -1125,6 +1162,86 @@ function purchaseVoucher($phone, $profileName, $mode = 'default', $customerPhone
  * Send price list
  */
 function sendPriceList($phone) {
+    // Check if user is agent first
+    $agent = getWhatsAppAgentByPhone($phone);
+    
+    if ($agent) {
+        // Send agent-specific price list
+        sendAgentPriceList($phone, $agent);
+    } else {
+        // Send general price list
+        sendGeneralPriceList($phone);
+    }
+}
+
+/**
+ * Send agent-specific price list
+ */
+function sendAgentPriceList($phone, $agent) {
+    try {
+        // Load database connection
+        if (!function_exists('getDBConnection')) {
+            if (file_exists('../include/db_config.php')) {
+                require_once('../include/db_config.php');
+            } else {
+                sendWhatsAppMessage($phone, "❌ Database tidak tersedia.");
+                return;
+            }
+        }
+        
+        $db = getDBConnection();
+        if (!$db) {
+            sendWhatsAppMessage($phone, "❌ Koneksi database gagal.");
+            return;
+        }
+        
+        // Load Agent class
+        if (!class_exists('Agent')) {
+            require_once('../lib/Agent.class.php');
+        }
+        
+        $agentClass = new Agent();
+        $agentPrices = $agentClass->getAllAgentPrices($agent['id']);
+        
+        if (empty($agentPrices)) {
+            sendWhatsAppMessage($phone, "❌ *HARGA BELUM DISET*\n\nBelum ada harga yang diset untuk agent Anda.\n\nSilakan hubungi admin untuk setting harga.");
+            return;
+        }
+        
+        $message = "*💰 DAFTAR HARGA AGENT*\n";
+        $message .= "*Agent: {$agent['agent_name']}*\n";
+        $message .= "*Saldo: Rp " . number_format($agent['balance'], 0, ',', '.') . "*\n";
+        $message .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        
+        foreach ($agentPrices as $price) {
+            $profit = $price['sell_price'] - $price['buy_price'];
+            $profitPercent = $price['buy_price'] > 0 ? round(($profit / $price['buy_price']) * 100, 1) : 0;
+            
+            $message .= "*{$price['profile_name']}*\n";
+            $message .= "Harga Beli: Rp " . number_format($price['buy_price'], 0, ',', '.') . "\n";
+            $message .= "Harga Jual: Rp " . number_format($price['sell_price'], 0, ',', '.') . "\n";
+            $message .= "Profit: Rp " . number_format($profit, 0, ',', '.') . " ({$profitPercent}%)\n\n";
+        }
+        
+        $message .= "━━━━━━━━━━━━━━━━━━━━\n";
+        $message .= "*Cara order:*\n";
+        $message .= "• VOUCHER <NAMA_PAKET>\n";
+        $message .= "• BELI <NAMA_PAKET>\n";
+        $message .= "• VCR <NAMA_PAKET>\n\n";
+        $message .= "*Contoh:* VOUCHER 1JAM";
+        
+        sendWhatsAppMessage($phone, $message);
+        
+    } catch (Exception $e) {
+        error_log("Error in sendAgentPriceList: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ Terjadi kesalahan saat mengambil daftar harga.\n\nSilakan coba lagi.");
+    }
+}
+
+/**
+ * Send general price list (for non-agents)
+ */
+function sendGeneralPriceList($phone) {
     global $sessionConfig;
     
     // Use session config instead of overwritten $data
@@ -2115,8 +2232,22 @@ function sendHelp($phone) {
     $message .= "Ubah WiFi Password Pelanggan (Admin)\n";
     $message .= "Contoh: GANTI SANDI 081234567890 password123456\n\n";
     
+    $message .= "💳 *TAGIHAN <NAMA/HP>*\n";
+    $message .= "Cek tagihan pelanggan billing\n";
+    $message .= "Contoh: TAGIHAN 081234567890\n";
+    $message .= "Contoh: TAGIHAN John Doe\n\n";
+    
+    $message .= "💰 *BAYAR <NAMA/HP> [PERIODE]*\n";
+    $message .= "Bayar tagihan pelanggan (Admin/Agent)\n";
+    $message .= "Contoh: BAYAR 081234567890\n";
+    $message .= "Contoh: BAYAR John Doe 2025-12\n\n";
+    
+    $message .= "📝 *REG <NOMOR_HP>*\n";
+    $message .= "Registrasi nomor agent/pelanggan\n";
+    $message .= "Contoh: REG 081234567890\n\n";
+    
     // Admin-only commands
-    $isAdmin = isAdminNumber($phone);
+    $isAdmin = isWhatsAppAdmin($phone);
     if ($isAdmin) {
         $message .= "━━━━━━━━━━━━━━━━━━━━\n";
         $message .= "*🔐 PERINTAH ADMIN*\n\n";
@@ -2173,6 +2304,11 @@ function logWebhook($data) {
     
     if (!file_exists($logDir)) {
         mkdir($logDir, 0755, true);
+    }
+    
+    // Log Rotation: Check if file exists and is larger than 10MB
+    if (file_exists($logFile) && filesize($logFile) > 10 * 1024 * 1024) {
+        rename($logFile, $logFile . '.bak');
     }
     
     $logEntry = date('Y-m-d H:i:s') . " | " . $data . "\n";
@@ -3154,6 +3290,602 @@ function changeWiFiPassword($phone, $deviceId, $newPassword) {
     } catch (Exception $e) {
         error_log("WiFi password change exception: " . $e->getMessage());
         sendWhatsAppMessage($phone, "❌ *ERROR MENGUBAH PASSWORD*\n\n" . $e->getMessage());
+    }
+}
+
+/**
+ * Check customer bills via WhatsApp
+ */
+function checkWhatsAppCustomerBills($phone, $customerIdentifier) {
+    try {
+        // Load database connection
+        if (!function_exists('getDBConnection')) {
+            if (file_exists('../include/db_config.php')) {
+                require_once('../include/db_config.php');
+            } else {
+                sendWhatsAppMessage($phone, "❌ Database tidak tersedia.");
+                return;
+            }
+        }
+        
+        $db = getDBConnection();
+        if (!$db) {
+            sendWhatsAppMessage($phone, "❌ Koneksi database gagal.");
+            return;
+        }
+        
+        // Search customer by name or phone
+        $stmt = $db->prepare(
+            "SELECT bc.*, bp.profile_name, bp.price_monthly as price " .
+            "FROM billing_customers bc " .
+            "LEFT JOIN billing_profiles bp ON bc.profile_id = bp.id " .
+            "WHERE bc.name LIKE :identifier OR bc.phone LIKE :identifier " .
+            "LIMIT 5"
+        );
+        $stmt->execute([':identifier' => '%' . $customerIdentifier . '%']);
+        $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (empty($customers)) {
+            sendWhatsAppMessage($phone, "❌ *PELANGGAN TIDAK DITEMUKAN*\n\nTidak ada pelanggan dengan nama atau nomor HP: *$customerIdentifier*");
+            return;
+        }
+        
+        if (count($customers) > 1) {
+            // Multiple customers found
+            $message = "🔍 *DITEMUKAN " . count($customers) . " PELANGGAN*\n\n";
+            
+            foreach ($customers as $index => $customer) {
+                $message .= "*" . ($index + 1) . ". {$customer['name']}*\n";
+                $message .= "HP: {$customer['phone']}\n";
+                $message .= "Profile: {$customer['profile_name']}\n";
+                $message .= "Status: " . ($customer['is_isolated'] ? '❌ Terisolir' : '✅ Aktif') . "\n\n";
+            }
+            
+            $message .= "Gunakan nama lengkap atau nomor HP yang lebih spesifik.";
+            sendWhatsAppMessage($phone, $message);
+            return;
+        }
+        
+        // Single customer found
+        $customer = $customers[0];
+        
+        // Get unpaid invoices
+        $stmt = $db->prepare(
+            "SELECT * FROM billing_invoices " .
+            "WHERE customer_id = :customer_id AND status IN ('unpaid', 'overdue') " .
+            "ORDER BY period DESC LIMIT 6"
+        );
+        $stmt->execute([':customer_id' => $customer['id']]);
+        $unpaidInvoices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $message = "💳 *INFO TAGIHAN PELANGGAN*\n\n";
+        $message .= "👤 Nama: *{$customer['name']}*\n";
+        $message .= "📞 HP: {$customer['phone']}\n";
+        $message .= "📦 Profile: {$customer['profile_name']}\n";
+        $message .= "💰 Tarif: Rp " . number_format($customer['price'], 0, ',', '.') . "/bulan\n";
+        $message .= "📊 Status: " . ($customer['is_isolated'] ? '❌ Terisolir' : '✅ Aktif') . "\n\n";
+        
+        if (empty($unpaidInvoices)) {
+            $message .= "✅ *TIDAK ADA TAGIHAN TERTUNGGAK*\n\n";
+            $message .= "Semua tagihan sudah lunas.";
+        } else {
+            $message .= "❌ *TAGIHAN TERTUNGGAK: " . count($unpaidInvoices) . "*\n\n";
+            
+            $totalUnpaid = 0;
+            
+            foreach ($unpaidInvoices as $invoice) {
+                $totalUnpaid += $invoice['amount'];
+                $dueDate = date('d/m/Y', strtotime($invoice['due_date']));
+                $period = date('M Y', strtotime($invoice['period'] . '-01'));
+                
+                $message .= "📅 *$period*\n";
+                $message .= "Jumlah: Rp " . number_format($invoice['amount'], 0, ',', '.') . "\n";
+                $message .= "Jatuh tempo: $dueDate\n";
+                $message .= "Status: " . ucfirst($invoice['status']) . "\n\n";
+            }
+            
+            $message .= "💰 *Total Tertunggak: Rp " . number_format($totalUnpaid, 0, ',', '.') . "*\n\n";
+            $message .= "📝 *Cara bayar:*\n";
+            $message .= "• BAYAR {$customer['phone']} - Bayar bulan ini\n";
+            $message .= "• BAYAR {$customer['phone']} 2025-12 - Bayar periode tertentu";
+        }
+        
+        sendWhatsAppMessage($phone, $message);
+        
+    } catch (Exception $e) {
+        error_log("Error in checkWhatsAppCustomerBills: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ Terjadi kesalahan saat mengecek tagihan.\n\nSilakan coba lagi.");
+    }
+}
+
+/**
+ * Process bill payment via WhatsApp
+ */
+function processWhatsAppBillPayment($phone, $customerIdentifier, $period) {
+    try {
+        // Load database connection
+        if (!function_exists('getDBConnection')) {
+            if (file_exists('../include/db_config.php')) {
+                require_once('../include/db_config.php');
+            } else {
+                sendWhatsAppMessage($phone, "❌ Database tidak tersedia.");
+                return;
+            }
+        }
+        
+        $db = getDBConnection();
+        if (!$db) {
+            sendWhatsAppMessage($phone, "❌ Koneksi database gagal.");
+            return;
+        }
+        
+        // Check if user is admin or agent
+        $isAdmin = isWhatsAppAdmin($phone);
+        $agent = null;
+        
+        if (!$isAdmin) {
+            $agent = getWhatsAppAgentByPhone($phone);
+            if (!$agent) {
+                sendWhatsAppMessage($phone, "❌ *AKSES DITOLAK*\n\nAnda tidak terdaftar sebagai admin atau agent.");
+                return;
+            }
+        }
+        
+        // Search customer
+        $stmt = $db->prepare(
+            "SELECT bc.*, bp.profile_name, bp.price_monthly as price " .
+            "FROM billing_customers bc " .
+            "LEFT JOIN billing_profiles bp ON bc.profile_id = bp.id " .
+            "WHERE bc.name LIKE :identifier OR bc.phone LIKE :identifier " .
+            "LIMIT 1"
+        );
+        $stmt->execute([':identifier' => '%' . $customerIdentifier . '%']);
+        $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$customer) {
+            sendWhatsAppMessage($phone, "❌ *PELANGGAN TIDAK DITEMUKAN*\n\nTidak ada pelanggan dengan nama atau nomor HP: *$customerIdentifier*");
+            return;
+        }
+        
+        // Get invoice
+        $stmt = $db->prepare(
+            "SELECT * FROM billing_invoices " .
+            "WHERE customer_id = :customer_id AND period = :period"
+        );
+        $stmt->execute([':customer_id' => $customer['id'], ':period' => $period]);
+        $invoice = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$invoice) {
+            sendWhatsAppMessage($phone, "❌ Tagihan untuk periode $period tidak ditemukan.");
+            return;
+        }
+        
+        if ($invoice['status'] === 'paid') {
+            sendWhatsAppMessage($phone, "✅ Tagihan periode $period sudah lunas.\n\nDibayar pada: " . date('d/m/Y H:i', strtotime($invoice['paid_at'])));
+            return;
+        }
+        
+        // Send processing message
+        $processingMsg = "⏳ *MEMPROSES PEMBAYARAN*\n\n";
+        $processingMsg .= "👤 Pelanggan: {$customer['name']}\n";
+        $processingMsg .= "📅 Periode: $period\n";
+        $processingMsg .= "💰 Jumlah: Rp " . number_format($invoice['amount'], 0, ',', '.') . "\n\n";
+        $processingMsg .= "🔄 Sedang diproses...";
+        sendWhatsAppMessage($phone, $processingMsg);
+        
+        if ($isAdmin) {
+            // Admin payment (no balance deduction)
+            $stmt = $db->prepare(
+                "UPDATE billing_invoices SET " .
+                "status = 'paid', paid_at = NOW(), payment_channel = 'admin_whatsapp', " .
+                "reference_number = :ref_number " .
+                "WHERE id = :invoice_id"
+            );
+            $refNumber = 'ADMIN-WA-' . time();
+            $stmt->execute([':ref_number' => $refNumber, ':invoice_id' => $invoice['id']]);
+            
+            $paymentMethod = 'Admin (WhatsApp)';
+            
+        } else {
+            // Agent payment (with balance deduction)
+            // Check balance
+            if ($agent['balance'] < $invoice['amount']) {
+                $reply = "❌ *SALDO TIDAK CUKUP*\n\n";
+                $reply .= "Saldo Anda: Rp " . number_format($agent['balance'], 0, ',', '.') . "\n";
+                $reply .= "Dibutuhkan: Rp " . number_format($invoice['amount'], 0, ',', '.') . "\n";
+                $reply .= "Kurang: Rp " . number_format($invoice['amount'] - $agent['balance'], 0, ',', '.') . "\n\n";
+                $reply .= "Silakan topup saldo terlebih dahulu.";
+                sendWhatsAppMessage($phone, $reply);
+                return;
+            }
+            
+            // Load Agent class
+            if (!class_exists('Agent')) {
+                require_once('../lib/Agent.class.php');
+            }
+            
+            $agentClass = new Agent();
+            
+            // Start transaction
+            $db->beginTransaction();
+            
+            try {
+                // Deduct agent balance
+                $deductResult = $agentClass->deductBalance(
+                    $agent['id'],
+                    $invoice['amount'],
+                    'billing_payment',
+                    $customer['name'],
+                    "Bayar tagihan {$customer['name']} periode $period",
+                    'billing_payment'
+                );
+                
+                if (!$deductResult['success']) {
+                    $db->rollBack();
+                    sendWhatsAppMessage($phone, "❌ Gagal memotong saldo: " . $deductResult['message']);
+                    return;
+                }
+                
+                // Update invoice status
+                $stmt = $db->prepare(
+                    "UPDATE billing_invoices SET " .
+                    "status = 'paid', paid_at = NOW(), payment_channel = 'agent_whatsapp', " .
+                    "reference_number = :ref_number, paid_via_agent_id = :agent_id " .
+                    "WHERE id = :invoice_id"
+                );
+                $refNumber = 'AG-WA-' . $agent['agent_code'] . '-' . time();
+                $stmt->execute([
+                    ':ref_number' => $refNumber,
+                    ':agent_id' => $agent['id'],
+                    ':invoice_id' => $invoice['id']
+                ]);
+                
+                // Record agent billing payment
+                $stmt = $db->prepare(
+                    "INSERT INTO agent_billing_payments (agent_id, invoice_id, amount, status, processed_by, payment_method) " .
+                    "VALUES (:agent_id, :invoice_id, :amount, 'paid', 'whatsapp', 'agent_balance')"
+                );
+                $stmt->execute([
+                    ':agent_id' => $agent['id'],
+                    ':invoice_id' => $invoice['id'],
+                    ':amount' => $invoice['amount']
+                ]);
+                
+                $db->commit();
+                $paymentMethod = "Agent {$agent['agent_name']} (WhatsApp)";
+                
+            } catch (Exception $e) {
+                $db->rollBack();
+                error_log("Error in agent payment transaction: " . $e->getMessage());
+                sendWhatsAppMessage($phone, "❌ Terjadi kesalahan saat memproses pembayaran.");
+                return;
+            }
+        }
+        
+        // Restore customer profile if isolated
+        if ($customer['is_isolated']) {
+            restoreWhatsAppCustomerProfile($customer);
+        }
+        
+        // Send success message
+        $successMsg = "✅ *PEMBAYARAN BERHASIL*\n\n";
+        $successMsg .= "👤 Pelanggan: *{$customer['name']}*\n";
+        $successMsg .= "📞 HP: {$customer['phone']}\n";
+        $successMsg .= "📅 Periode: *$period*\n";
+        $successMsg .= "💰 Jumlah: *Rp " . number_format($invoice['amount'], 0, ',', '.') . "*\n";
+        $successMsg .= "💳 Metode: $paymentMethod\n";
+        $successMsg .= "📝 Referensi: `$refNumber`\n\n";
+        
+        if (!$isAdmin && $agent) {
+            $updatedAgent = $agentClass->getAgentById($agent['id']);
+            $successMsg .= "💳 Saldo tersisa: Rp " . number_format($updatedAgent['balance'], 0, ',', '.') . "\n\n";
+        }
+        
+        if ($customer['is_isolated']) {
+            $successMsg .= "✅ *Pelanggan telah dikembalikan ke profile aktif.*\n\n";
+        }
+        
+        $successMsg .= "✨ _Pembayaran telah dicatat dalam sistem._";
+        
+        sendWhatsAppMessage($phone, $successMsg);
+        
+    } catch (Exception $e) {
+        if (isset($db) && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        error_log("Error in processWhatsAppBillPayment: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ Terjadi kesalahan saat memproses pembayaran.\n\nSilakan coba lagi.");
+    }
+}
+
+/**
+ * Restore customer profile from isolation via WhatsApp
+ */
+function restoreWhatsAppCustomerProfile($customer) {
+    try {
+        // Load session config
+        global $sessionConfig;
+        if (empty($sessionConfig)) {
+            error_log("No session config for profile restoration");
+            return false;
+        }
+        
+        // Get first session
+        $sessions = array_keys($sessionConfig);
+        $session = null;
+        foreach ($sessions as $s) {
+            if ($s != 'mikhmon') {
+                $session = $s;
+                break;
+            }
+        }
+        
+        if (!$session) {
+            error_log("No MikroTik session found for profile restoration");
+            return false;
+        }
+        
+        // Load session config
+        $sessionData = $sessionConfig[$session];
+        $iphost = explode('!', $sessionData[1])[1] ?? '';
+        $userhost = explode('@|@', $sessionData[2])[1] ?? '';
+        $passwdhost = explode('#|#', $sessionData[3])[1] ?? '';
+        
+        if (empty($iphost) || empty($userhost) || empty($passwdhost)) {
+            error_log("Incomplete session config for profile restoration");
+            return false;
+        }
+        
+        // Connect to MikroTik
+        $API = new RouterosAPI();
+        $API->debug = false;
+        
+        if (!$API->connect($iphost, $userhost, decrypt($passwdhost))) {
+            error_log("Failed to connect to MikroTik for profile restoration");
+            return false;
+        }
+        
+        // Find PPPoE user
+        $pppoeUsers = $API->comm("/ppp/secret/print", array(
+            "?name" => $customer['genieacs_pppoe_username']
+        ));
+        
+        if (!empty($pppoeUsers)) {
+            $pppoeUser = $pppoeUsers[0];
+            $currentProfile = $pppoeUser['profile'] ?? '';
+            
+            // Check if user is isolated (profile contains 'isolir' or similar)
+            if (stripos($currentProfile, 'isolir') !== false || stripos($currentProfile, 'block') !== false) {
+                // Restore to original profile
+                $API->comm("/ppp/secret/set", array(
+                    ".id" => $pppoeUser['.id'],
+                    "profile" => $customer['profile_name'] // Restore to customer's profile
+                ));
+                
+                error_log("Restored customer {$customer['name']} from profile $currentProfile to {$customer['profile_name']}");
+            }
+        }
+        
+        $API->disconnect();
+        
+        // Update customer isolation status
+        $db = getDBConnection();
+        if ($db) {
+            $stmt = $db->prepare("UPDATE billing_customers SET is_isolated = 0 WHERE id = :id");
+            $stmt->execute([':id' => $customer['id']]);
+        }
+        
+        return true;
+        
+    } catch (Exception $e) {
+        error_log("Error in restoreWhatsAppCustomerProfile: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Check if WhatsApp user is admin
+ */
+function isWhatsAppAdmin($phone) {
+    // Load admin phone numbers from config or database
+    $adminPhones = ['6281947215703', '081947215703']; // Add your admin numbers here
+    
+    // Remove country code variations for comparison
+    $cleanPhone = preg_replace('/^(\+62|62|0)/', '', $phone);
+    
+    foreach ($adminPhones as $adminPhone) {
+        $cleanAdminPhone = preg_replace('/^(\+62|62|0)/', '', $adminPhone);
+        if ($cleanPhone === $cleanAdminPhone) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Get agent price for specific profile (WhatsApp)
+ */
+function getWhatsAppAgentPrice($agentId, $profileName) {
+    try {
+        if (!function_exists('getDBConnection')) {
+            return null;
+        }
+        
+        $db = getDBConnection();
+        if (!$db) {
+            return null;
+        }
+        
+        $stmt = $db->prepare("SELECT * FROM agent_prices WHERE agent_id = :agent_id AND profile_name = :profile_name");
+        $stmt->execute([':agent_id' => $agentId, ':profile_name' => $profileName]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+        
+    } catch (Exception $e) {
+        error_log("Error in getWhatsAppAgentPrice: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Get agent by WhatsApp phone number
+ */
+function getWhatsAppAgentByPhone($phone) {
+    try {
+        if (!function_exists('getDBConnection')) {
+            return null;
+        }
+        
+        $db = getDBConnection();
+        if (!$db) {
+            return null;
+        }
+        
+        // Clean phone number for comparison
+        $cleanPhone = preg_replace('/^(\+62|62|0)/', '', $phone);
+        
+        $stmt = $db->prepare(
+            "SELECT * FROM agents WHERE " .
+            "(phone LIKE :phone1 OR phone LIKE :phone2 OR phone LIKE :phone3) " .
+            "AND status = 'active'"
+        );
+        $stmt->execute([
+            ':phone1' => '%' . $cleanPhone,
+            ':phone2' => '%62' . $cleanPhone,
+            ':phone3' => '%0' . $cleanPhone
+        ]);
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+        
+    } catch (Exception $e) {
+        error_log("Error in getWhatsAppAgentByPhone: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Process WhatsApp agent registration
+ */
+function processWhatsAppAgentRegistration($phone, $phoneNumber) {
+    try {
+        // Clean phone number
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
+        
+        // Normalize phone number formats
+        if (substr($cleanPhone, 0, 2) === '62') {
+            $cleanPhone = '0' . substr($cleanPhone, 2);
+        } elseif (substr($cleanPhone, 0, 1) === '1' && strlen($cleanPhone) > 10) {
+            // Remove country code if it looks like +1 format
+            $cleanPhone = '0' . $cleanPhone;
+        }
+        
+        if (strlen($cleanPhone) < 10 || strlen($cleanPhone) > 15) {
+            sendWhatsAppMessage($phone, "❌ *NOMOR HP TIDAK VALID*\n\nFormat nomor HP tidak sesuai.\n\n*Contoh format yang benar:*\n• 081234567890\n• 08123456789\n• 6281234567890");
+            return;
+        }
+        
+        // Load database connection
+        if (!function_exists('getDBConnection')) {
+            if (file_exists('../include/db_config.php')) {
+                require_once('../include/db_config.php');
+            } else {
+                sendWhatsAppMessage($phone, "❌ Database tidak tersedia.");
+                return;
+            }
+        }
+        
+        $db = getDBConnection();
+        if (!$db) {
+            sendWhatsAppMessage($phone, "❌ Koneksi database gagal.");
+            return;
+        }
+        
+        // Send processing message
+        sendWhatsAppMessage($phone, "🔍 *MENCARI NOMOR HP...*\n\nMencari nomor: $cleanPhone\n\n⏳ Mohon tunggu...");
+        
+        // Clean sender phone for comparison
+        $senderPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (substr($senderPhone, 0, 2) === '62') {
+            $senderPhone = '0' . substr($senderPhone, 2);
+        }
+        
+        // Check if this phone is already registered as agent
+        $stmt = $db->prepare("SELECT id, agent_name, phone FROM agents WHERE phone = :phone");
+        $stmt->execute([':phone' => $senderPhone]);
+        $existingAgent = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existingAgent) {
+            sendWhatsAppMessage($phone, "⚠️ *SUDAH TERDAFTAR*\n\nNomor WhatsApp Anda sudah terdaftar sebagai:\n\n👤 **{$existingAgent['agent_name']}**\n📞 {$existingAgent['phone']}\n\nJika ingin mengganti, hubungi administrator.");
+            return;
+        }
+        
+        // Search for agent by phone number (flexible matching)
+        $stmt = $db->prepare(
+            "SELECT id, agent_code, agent_name, phone, status FROM agents " .
+            "WHERE (phone = :phone1 OR phone = :phone2 OR phone = :phone3 OR phone = :phone4) " .
+            "AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([
+            ':phone1' => $cleanPhone,
+            ':phone2' => '62' . substr($cleanPhone, 1),
+            ':phone3' => '+62' . substr($cleanPhone, 1),
+            ':phone4' => $phoneNumber // Original input
+        ]);
+        $agent = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$agent) {
+            // Also check billing customers
+            $stmt = $db->prepare(
+                "SELECT id, name, phone FROM billing_customers " .
+                "WHERE (phone = :phone1 OR phone = :phone2 OR phone = :phone3 OR phone = :phone4) " .
+                "AND status = 'active' LIMIT 1"
+            );
+            $stmt->execute([
+                ':phone1' => $cleanPhone,
+                ':phone2' => '62' . substr($cleanPhone, 1),
+                ':phone3' => '+62' . substr($cleanPhone, 1),
+                ':phone4' => $phoneNumber
+            ]);
+            $customer = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($customer) {
+                sendWhatsAppMessage($phone, "✅ *REGISTRASI BERHASIL*\n\n🎉 **Selamat datang, {$customer['name']}!**\n\n👤 **Status:** PELANGGAN\n📞 **HP:** {$customer['phone']}\n💬 **WhatsApp:** Terhubung\n\n📋 **Fitur yang tersedia:**\n• TAGIHAN [nama/hp] - Cek tagihan\n• HARGA - Lihat paket\n\n🤖 Akun WhatsApp Anda sekarang terhubung dengan sistem billing.");
+                return;
+            }
+            
+            sendWhatsAppMessage($phone, "❌ *NOMOR TIDAK DITEMUKAN*\n\nNomor HP **$cleanPhone** tidak terdaftar dalam sistem.\n\n📝 **Kemungkinan penyebab:**\n• Nomor belum didaftarkan sebagai agent\n• Format nomor tidak sesuai\n• Status agent tidak aktif\n\n💡 **Solusi:**\n• Pastikan nomor HP sudah terdaftar\n• Hubungi administrator untuk registrasi\n• Coba format nomor lain (dengan/tanpa kode negara)");
+            return;
+        }
+        
+        // Check if the requesting phone matches the agent phone
+        if ($senderPhone !== $cleanPhone && $senderPhone !== ('62' . substr($cleanPhone, 1))) {
+            sendWhatsAppMessage($phone, "❌ *NOMOR TIDAK COCOK*\n\nAnda hanya bisa registrasi nomor HP Anda sendiri.\n\n📱 **Nomor WhatsApp Anda:** $senderPhone\n🔍 **Nomor yang dicari:** $cleanPhone\n\n💡 Gunakan: `REG $senderPhone`");
+            return;
+        }
+        
+        // Success message
+        $message = "✅ *REGISTRASI BERHASIL*\n\n";
+        $message .= "🎉 **Selamat datang, {$agent['agent_name']}!**\n\n";
+        $message .= "👤 **Status:** AGENT\n";
+        $message .= "🏷️ **Kode:** {$agent['agent_code']}\n";
+        $message .= "📞 **HP:** {$agent['phone']}\n";
+        $message .= "💬 **WhatsApp:** Terhubung\n\n";
+        $message .= "🎫 **Fitur Agent:**\n";
+        $message .= "• HARGA - Lihat harga agent\n";
+        $message .= "• VOUCHER [paket] - Generate voucher\n";
+        $message .= "• BAYAR [nama/hp] - Bayar tagihan\n";
+        $message .= "• TAGIHAN [nama/hp] - Cek tagihan\n\n";
+        $message .= "🤖 **Akun WhatsApp Anda sekarang terhubung dengan sistem agent!**\n\n";
+        $message .= "💡 Ketik HARGA untuk melihat daftar paket agent.";
+        
+        sendWhatsAppMessage($phone, $message);
+        
+        // Log successful registration
+        error_log("WhatsApp agent registration successful: Agent {$agent['agent_name']} (ID: {$agent['id']}) confirmed with phone: $phone");
+        
+    } catch (Exception $e) {
+        error_log("Error in processWhatsAppAgentRegistration: " . $e->getMessage());
+        sendWhatsAppMessage($phone, "❌ Terjadi kesalahan saat registrasi.\n\nSilakan coba lagi atau hubungi administrator.");
     }
 }
 

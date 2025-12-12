@@ -32,20 +32,32 @@ if (isset($_POST['update_agent'])) {
         'level' => $_POST['level'],
         'commission_amount' => floatval($_POST['commission_amount']),
         'status' => $_POST['status'],
-        'notes' => trim($_POST['notes'])
+        'notes' => trim($_POST['notes']),
+        'telegram_chat_id' => trim($_POST['telegram_chat_id']),
+        'telegram_username' => trim($_POST['telegram_username'])
     ];
     
     if (!empty($_POST['password'])) {
         $data['password'] = $_POST['password'];
     }
     
-    $result = $agent->updateAgent($agentId, $data);
+    // Check if telegram_chat_id already exists for another agent (if provided)
+    if (!empty($data['telegram_chat_id']) && $data['telegram_chat_id'] != $agentData['telegram_chat_id']) {
+        $existingTelegram = $agent->getAgentByTelegramChatId($data['telegram_chat_id']);
+        if ($existingTelegram && $existingTelegram['id'] != $agentId) {
+            $error = 'User ID Telegram sudah terdaftar untuk agent lain!';
+        }
+    }
     
-    if ($result['success']) {
-        $success = 'Data agent berhasil diupdate!';
-        $agentData = $agent->getAgentById($agentId);
-    } else {
-        $error = $result['message'];
+    if (empty($error)) {
+        $result = $agent->updateAgent($agentId, $data);
+        
+        if ($result['success']) {
+            $success = 'Data agent berhasil diupdate!';
+            $agentData = $agent->getAgentById($agentId);
+        } else {
+            $error = $result['message'];
+        }
     }
 }
 ?>
@@ -112,6 +124,23 @@ if (isset($_POST['update_agent'])) {
                 <div class="form-group">
                     <label>Password Baru</label>
                     <input type="password" name="password" class="form-control" placeholder="Kosongkan jika tidak ingin mengubah">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>User ID Telegram</label>
+                    <input type="text" name="telegram_chat_id" class="form-control" 
+                           value="<?= htmlspecialchars($agentData['telegram_chat_id'] ?? ''); ?>" 
+                           placeholder="123456789">
+                    <small style="color: #666;">Chat ID Telegram agent (opsional)</small>
+                </div>
+                <div class="form-group">
+                    <label>Username Telegram</label>
+                    <input type="text" name="telegram_username" class="form-control" 
+                           value="<?= htmlspecialchars($agentData['telegram_username'] ?? ''); ?>" 
+                           placeholder="@username">
+                    <small style="color: #666;">Username Telegram agent (opsional)</small>
                 </div>
             </div>
         </div>

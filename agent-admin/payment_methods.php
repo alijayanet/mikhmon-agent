@@ -109,6 +109,77 @@ $type_icons = [
                 </div>
                 <?php endif; ?>
                 
+                <!-- Summary -->
+                <div class="row mb-3">
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-blue bmh-75">
+                            <h1><?= count($payment_methods); ?>
+                                <span style="font-size: 15px;">methods</span>
+                            </h1>
+                            <div><i class="fa fa-credit-card"></i> Total Payment Methods</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-green bmh-75">
+                            <h1><?= count(array_filter($payment_methods, function($m) { return $m['is_active']; })); ?>
+                                <span style="font-size: 15px;">active</span>
+                            </h1>
+                            <div><i class="fa fa-check"></i> Active Methods</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-yellow bmh-75">
+                            <h1><?= count($grouped_methods['qris'] ?? []); ?>
+                                <span style="font-size: 15px;">QRIS</span>
+                            </h1>
+                            <div><i class="fa fa-qrcode"></i> QRIS Methods</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-red bmh-75">
+                            <h1><?= count(array_filter($payment_methods, function($m) { return !$m['is_active']; })); ?>
+                                <span style="font-size: 15px;">inactive</span>
+                            </h1>
+                            <div><i class="fa fa-times"></i> Inactive Methods</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-purple bmh-75">
+                            <h1><?= count($grouped_methods['va'] ?? []); ?>
+                                <span style="font-size: 15px;">VA</span>
+                            </h1>
+                            <div><i class="fa fa-bank"></i> Virtual Account</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-navy bmh-75">
+                            <h1><?= count($grouped_methods['ewallet'] ?? []); ?>
+                                <span style="font-size: 15px;">e-wallet</span>
+                            </h1>
+                            <div><i class="fa fa-mobile"></i> E-Wallet Methods</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-orange bmh-75">
+                            <h1><?= count($grouped_methods['retail'] ?? []); ?>
+                                <span style="font-size: 15px;">retail</span>
+                            </h1>
+                            <div><i class="fa fa-shopping-cart"></i> Retail Store</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-teal bmh-75">
+                            <h1><?= count(array_filter($payment_methods, function($m) { return $m['admin_fee_type'] === 'percentage'; })); ?>
+                                <span style="font-size: 15px;">percent</span>
+                            </h1>
+                            <div><i class="fa fa-percent"></i> Percentage Fee</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="alert alert-info">
                     <h5><i class="fa fa-info-circle"></i> Information</h5>
                     <p><strong>Admin Fee</strong> adalah biaya tambahan yang dikenakan kepada customer di atas fee payment gateway.</p>
@@ -172,17 +243,17 @@ $type_icons = [
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-striped">
+                            <table class="table table-bordered table-striped">
                                 <thead>
                                     <tr>
-                                        <th>Method</th>
-                                        <th>Current Fee</th>
-                                        <th>Fee Type</th>
-                                        <th>Fee Value</th>
-                                        <th>Min Amount</th>
-                                        <th>Max Amount</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
+                                        <th width="25%">Method</th>
+                                        <th width="12%">Current Fee</th>
+                                        <th width="12%">Fee Type</th>
+                                        <th width="10%">Fee Value</th>
+                                        <th width="10%">Min Amount</th>
+                                        <th width="10%">Max Amount</th>
+                                        <th width="8%">Status</th>
+                                        <th width="13%">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -204,32 +275,37 @@ $type_icons = [
                                                 <?= $method['admin_fee_type'] === 'percentage' ? $method['admin_fee_value'] . '%' : 'Rp ' . number_format($method['admin_fee_value']); ?>
                                             </span>
                                         </td>
-                                        <td colspan="6">
-                                            <form method="POST" class="form-inline">
+                                        <td>
+                                            <form method="POST" id="form_<?= $method['id']; ?>">
                                                 <input type="hidden" name="action" value="update_method">
                                                 <input type="hidden" name="id" value="<?= $method['id']; ?>">
                                                 
-                                                <select name="admin_fee_type" class="form-control form-control-sm mr-2 mb-2">
-                                                    <option value="fixed" <?= $method['admin_fee_type'] === 'fixed' ? 'selected' : ''; ?>>Fixed (Rp)</option>
-                                                    <option value="percentage" <?= $method['admin_fee_type'] === 'percentage' ? 'selected' : ''; ?>>Percentage (%)</option>
+                                                <select name="admin_fee_type" class="form-control form-control-sm">
+                                                    <option value="fixed" <?= $method['admin_fee_type'] === 'fixed' ? 'selected' : ''; ?>>Fixed</option>
+                                                    <option value="percentage" <?= $method['admin_fee_type'] === 'percentage' ? 'selected' : ''; ?>>Percentage</option>
                                                 </select>
-                                                
-                                                <input type="number" name="admin_fee_value" class="form-control form-control-sm mr-2 mb-2" 
-                                                       value="<?= $method['admin_fee_value']; ?>" step="0.01" min="0" placeholder="Fee Value" style="width: 100px;">
-                                                
-                                                <input type="number" name="min_amount" class="form-control form-control-sm mr-2 mb-2" 
-                                                       value="<?= $method['min_amount']; ?>" placeholder="Min" style="width: 80px;">
-                                                
-                                                <input type="number" name="max_amount" class="form-control form-control-sm mr-2 mb-2" 
-                                                       value="<?= $method['max_amount']; ?>" placeholder="Max" style="width: 100px;">
-                                                
-                                                <div class="form-check form-check-inline mr-2 mb-2">
+                                        </td>
+                                        <td>
+                                                <input type="number" name="admin_fee_value" class="form-control form-control-sm" 
+                                                       value="<?= $method['admin_fee_value']; ?>" step="0.01" min="0">
+                                        </td>
+                                        <td>
+                                                <input type="number" name="min_amount" class="form-control form-control-sm" 
+                                                       value="<?= $method['min_amount']; ?>" placeholder="0">
+                                        </td>
+                                        <td>
+                                                <input type="number" name="max_amount" class="form-control form-control-sm" 
+                                                       value="<?= $method['max_amount']; ?>" placeholder="0">
+                                        </td>
+                                        <td>
+                                                <div class="form-check">
                                                     <input type="checkbox" name="is_active" class="form-check-input" 
                                                            <?= $method['is_active'] ? 'checked' : ''; ?>>
                                                     <label class="form-check-label">Active</label>
                                                 </div>
-                                                
-                                                <button type="submit" class="btn btn-success btn-sm mb-2">
+                                        </td>
+                                        <td>
+                                                <button type="submit" class="btn btn-success btn-sm">
                                                     <i class="fa fa-save"></i> Update
                                                 </button>
                                             </form>
@@ -243,61 +319,15 @@ $type_icons = [
                 </div>
                 <?php endforeach; ?>
                 
-                <!-- Summary -->
-                <div class="card card-info">
-                    <div class="card-header">
-                        <h3 class="card-title"><i class="fa fa-info-circle"></i> Summary</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-info"><i class="fa fa-credit-card"></i></span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">Total Methods</span>
-                                        <span class="info-box-number"><?= count($payment_methods); ?></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-success"><i class="fa fa-check"></i></span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">Active Methods</span>
-                                        <span class="info-box-number"><?= count(array_filter($payment_methods, function($m) { return $m['is_active']; })); ?></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-warning"><i class="fa fa-qrcode"></i></span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">QRIS Methods</span>
-                                        <span class="info-box-number"><?= count($grouped_methods['qris'] ?? []); ?></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-primary"><i class="fa fa-bank"></i></span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">VA Methods</span>
-                                        <span class="info-box-number"><?= count($grouped_methods['va'] ?? []); ?></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="alert alert-warning">
-                            <h5><i class="fa fa-exclamation-triangle"></i> Important Notes:</h5>
-                            <ul class="mb-0">
-                                <li><strong>Admin Fee</strong> adalah keuntungan untuk admin/agen, bukan fee payment gateway</li>
-                                <li><strong>Fee Payment Gateway</strong> (seperti fee Tripay) sudah diatur di dashboard payment gateway</li>
-                                <li><strong>Total yang dibayar customer</strong> = Harga Voucher + Admin Fee + Fee Payment Gateway</li>
-                                <li>Jika tidak ingin keuntungan tambahan, set Admin Fee = 0</li>
-                            </ul>
-                        </div>
-                    </div>
+                <!-- Important Notes -->
+                <div class="alert alert-warning">
+                    <h5><i class="fa fa-exclamation-triangle"></i> Important Notes:</h5>
+                    <ul class="mb-0">
+                        <li><strong>Admin Fee</strong> adalah keuntungan untuk admin/agen, bukan fee payment gateway</li>
+                        <li><strong>Fee Payment Gateway</strong> (seperti fee Tripay) sudah diatur di dashboard payment gateway</li>
+                        <li><strong>Total yang dibayar customer</strong> = Harga Voucher + Admin Fee + Fee Payment Gateway</li>
+                        <li>Jika tidak ingin keuntungan tambahan, set Admin Fee = 0</li>
+                    </ul>
                 </div>
                 
             </div>
@@ -310,22 +340,241 @@ $type_icons = [
     flex-shrink: 0;
 }
 
-.form-inline .form-control {
-    margin-bottom: 5px;
+.table td {
+    vertical-align: middle;
+}
+
+.form-control-sm {
+    font-size: 0.875rem;
+}
+
+.form-check {
+    margin-bottom: 0;
+}
+
+.form-check-label {
+    font-size: 0.875rem;
+    margin-left: 0.25rem;
 }
 
 @media (max-width: 768px) {
-    .form-inline {
-        flex-direction: column;
-        align-items: stretch;
+    .table-responsive {
+        font-size: 0.8rem;
     }
     
-    .form-inline .form-control,
-    .form-inline .form-check,
-    .form-inline .btn {
+    .method-icon {
+        width: 25px !important;
+        height: 25px !important;
+    }
+    
+    .method-icon i {
+        font-size: 12px !important;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Mobile layout fixes - Force 2 columns */
+@media (max-width: 767px) {
+    .col-3.col-box-6 {
+        flex: 0 0 calc(50% - 10px) !important;
+        max-width: calc(50% - 10px) !important;
+        width: calc(50% - 10px) !important;
+        margin: 5px !important;
+        float: left !important;
+        display: block !important;
+    }
+    
+    .row.mb-3 {
+        display: block !important;
+        margin-left: 0 !important;
         margin-right: 0 !important;
-        margin-bottom: 10px;
-        width: 100%;
+        overflow: hidden !important;
+    }
+    
+    .row.mb-3::after {
+        content: "" !important;
+        display: table !important;
+        clear: both !important;
+    }
+    
+    .box {
+        height: 90px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        margin-bottom: 0 !important;
+        text-align: center !important;
+    }
+    
+    .box h1 {
+        font-size: 1.1rem !important;
+        margin-bottom: 3px !important;
+    }
+    
+    .box h1 span {
+        font-size: 0.65rem !important;
+    }
+    
+    .box div {
+        font-size: 0.7rem !important;
+        line-height: 1.1 !important;
+    }
+}
+
+/* Extra small mobile */
+@media (max-width: 480px) {
+    .col-3.col-box-6 {
+        flex: 0 0 calc(50% - 6px) !important;
+        max-width: calc(50% - 6px) !important;
+        width: calc(50% - 6px) !important;
+        margin: 3px !important;
+    }
+    
+    .box {
+        height: 80px !important;
+    }
+    
+    .box h1 {
+        font-size: 1rem !important;
+    }
+    
+    .box h1 span {
+        font-size: 0.6rem !important;
+    }
+    
+    .box div {
+        font-size: 0.65rem !important;
+    }
+}
+
+/* Table responsive for mobile */
+@media (max-width: 767px) {
+    .table-responsive {
+        border: none !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    .table {
+        font-size: 0.75rem !important;
+        margin-bottom: 0 !important;
+    }
+    
+    .table th,
+    .table td {
+        padding: 8px 4px !important;
+        vertical-align: middle !important;
+        border: 1px solid #dee2e6 !important;
+    }
+    
+    .table th {
+        background-color: #f8f9fa !important;
+        font-weight: 600 !important;
+        font-size: 0.7rem !important;
+        white-space: nowrap !important;
+    }
+    
+    .method-icon {
+        width: 20px !important;
+        height: 20px !important;
+        margin-right: 5px !important;
+    }
+    
+    .method-icon i {
+        font-size: 10px !important;
+    }
+    
+    .form-control-sm {
+        font-size: 0.7rem !important;
+        padding: 4px 6px !important;
+        height: auto !important;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px !important;
+        font-size: 0.65rem !important;
+    }
+    
+    .form-check {
+        margin-bottom: 0 !important;
+    }
+    
+    .form-check-input {
+        margin-top: 2px !important;
+    }
+    
+    .form-check-label {
+        font-size: 0.65rem !important;
+        margin-left: 3px !important;
+    }
+    
+    .badge {
+        font-size: 0.6rem !important;
+        padding: 2px 6px !important;
+    }
+}
+
+/* Extra small mobile table */
+@media (max-width: 480px) {
+    .table {
+        font-size: 0.7rem !important;
+    }
+    
+    .table th,
+    .table td {
+        padding: 6px 3px !important;
+    }
+    
+    .table th {
+        font-size: 0.65rem !important;
+    }
+    
+    .method-icon {
+        width: 18px !important;
+        height: 18px !important;
+    }
+    
+    .method-icon i {
+        font-size: 9px !important;
+    }
+    
+    .form-control-sm {
+        font-size: 0.65rem !important;
+        padding: 3px 5px !important;
+    }
+    
+    .btn-sm {
+        padding: 3px 6px !important;
+        font-size: 0.6rem !important;
+    }
+    
+    .form-check-label {
+        font-size: 0.6rem !important;
+    }
+    
+    .badge {
+        font-size: 0.55rem !important;
+        padding: 1px 4px !important;
+    }
+}
+
+/* Horizontal scroll indicator for mobile */
+@media (max-width: 767px) {
+    .table-responsive::before {
+        content: "← Geser untuk melihat semua kolom →" !important;
+        display: block !important;
+        text-align: center !important;
+        background: #fff3cd !important;
+        color: #856404 !important;
+        padding: 8px !important;
+        font-size: 0.7rem !important;
+        border: 1px solid #ffeaa7 !important;
+        border-radius: 4px !important;
+        margin-bottom: 10px !important;
     }
 }
 </style>

@@ -54,17 +54,32 @@ if (isset($_GET['delete'])) {
 
 // Handle set/update price (regular POST - non-AJAX)
 if (isset($_POST['set_price'])) {
+    $action = $_POST['action'] ?? 'create';
     $agentId = $_POST['agent_id'];
     $profileName = $_POST['profile_name'];
     $buyPrice = floatval($_POST['buy_price']);
     $sellPrice = floatval($_POST['sell_price']);
     
-    $result = $agent->setAgentPrice($agentId, $profileName, $buyPrice, $sellPrice);
+    error_log("Processing price action: $action for agent $agentId, profile $profileName");
     
-    if ($result['success']) {
-        $success = 'Harga berhasil diset!';
+    if ($action === 'update') {
+        // For update, we still use setAgentPrice as it handles both create and update
+        $result = $agent->setAgentPrice($agentId, $profileName, $buyPrice, $sellPrice);
+        
+        if ($result['success']) {
+            $success = 'Harga berhasil diupdate!';
+        } else {
+            $error = $result['message'];
+        }
     } else {
-        $error = $result['message'];
+        // For create
+        $result = $agent->setAgentPrice($agentId, $profileName, $buyPrice, $sellPrice);
+        
+        if ($result['success']) {
+            $success = 'Harga berhasil diset!';
+        } else {
+            $error = $result['message'];
+        }
     }
 }
 
@@ -112,6 +127,19 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
     position: relative;
     z-index: 10001 !important;
 }
+
+/* Ensure buttons are clickable */
+.table .btn {
+    pointer-events: auto;
+    cursor: pointer;
+    position: relative;
+    z-index: 10;
+}
+
+.table .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
 </style>
 
 <div class="row">
@@ -145,8 +173,9 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
             <h3 style="margin: 0;"><i class="fa fa-plus-circle"></i> Set Harga Baru</h3>
             <button type="button" onclick="hideAddPriceModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
         </div>
-        <form data-api-form data-api-endpoint="api/agent-prices.php" data-success-reload="true">
+        <form method="POST" action="">
             <input type="hidden" name="action" value="create">
+            <input type="hidden" name="price_id" value="">
             <div class="form-row">
                 <div class="form-group">
                     <label>Pilih Agent</label>
@@ -239,6 +268,8 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
 <script src="./js/billing_forms.js"></script>
 <script>
 function showAddPriceModal() {
+    console.log('showAddPriceModal called');
+    
     // Show modal
     var modal = document.getElementById('priceAddModal');
     if (modal) {
@@ -250,21 +281,29 @@ function showAddPriceModal() {
     var profileSelect = document.querySelector('select[name="profile_name"]');
     var buyPriceInput = document.querySelector('input[name="buy_price"]');
     var sellPriceInput = document.querySelector('input[name="sell_price"]');
+    var actionInput = document.querySelector('input[name="action"]');
     
     if (agentSelect) agentSelect.value = '';
     if (profileSelect) profileSelect.value = '';
     if (buyPriceInput) buyPriceInput.value = '';
     if (sellPriceInput) sellPriceInput.value = '';
+    if (actionInput) actionInput.value = 'create';
     
     // Focus on agent
     if (agentSelect) agentSelect.focus();
     
-    // Change button text
-    var btn = document.querySelector('button[type="submit"]');
+    // Change button text and style
+    var btn = document.querySelector('button[name="set_price"]');
     if (btn) {
         btn.innerHTML = '<i class="fa fa-save"></i> Simpan Harga';
         btn.classList.remove('btn-warning');
         btn.classList.add('btn-primary');
+    }
+    
+    // Change modal title
+    var modalTitle = document.querySelector('#priceAddModal h3');
+    if (modalTitle) {
+        modalTitle.innerHTML = '<i class="fa fa-plus-circle"></i> Set Harga Baru';
     }
 }
 
@@ -276,22 +315,95 @@ function hideAddPriceModal() {
 }
 
 function editPrice(agentId, profileName, buyPrice, sellPrice) {
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    console.log('editPrice called with:', agentId, profileName, buyPrice, sellPrice);
     
-    // Fill form
-    document.querySelector('select[name="agent_id"]').value = agentId;
-    document.querySelector('select[name="profile_name"]').value = profileName;
-    document.querySelector('input[name="buy_price"]').value = buyPrice;
-    document.querySelector('input[name="sell_price"]').value = sellPrice;
+    // Show modal first
+    showAddPriceModal();
     
-    // Focus on buy price
-    document.querySelector('input[name="buy_price"]').focus();
-    
-    // Change button text
-    const btn = document.querySelector('button[name="set_price"]');
-    btn.innerHTML = '<i class="fa fa-save"></i> Update Harga';
-    btn.classList.remove('btn-primary');
-    btn.classList.add('btn-warning');
+    // Wait a bit for modal to show, then fill form
+    setTimeout(function() {
+        try {
+            // Fill form
+            const agentSelect = document.querySelector('select[name="agent_id"]');
+            const profileSelect = document.querySelector('select[name="profile_name"]');
+            const buyPriceInput = document.querySelector('input[name="buy_price"]');
+            const sellPriceInput = document.querySelector('input[name="sell_price"]');
+            
+            console.log('Form elements found:', {
+                agentSelect: !!agentSelect,
+                profileSelect: !!profileSelect,
+                buyPriceInput: !!buyPriceInput,
+                sellPriceInput: !!sellPriceInput
+            });
+            
+            if (agentSelect) agentSelect.value = agentId;
+            if (profileSelect) profileSelect.value = profileName;
+            if (buyPriceInput) buyPriceInput.value = buyPrice;
+            if (sellPriceInput) sellPriceInput.value = sellPrice;
+            
+            // Focus on buy price
+            if (buyPriceInput) buyPriceInput.focus();
+            
+            // Change button text and style
+            const btn = document.querySelector('button[name="set_price"]');
+            if (btn) {
+                btn.innerHTML = '<i class="fa fa-save"></i> Update Harga';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-warning');
+                console.log('Button updated for edit mode');
+            }
+            
+            // Change form action
+            const actionInput = document.querySelector('input[name="action"]');
+            if (actionInput) {
+                actionInput.value = 'update';
+            }
+            
+            console.log('Edit form populated successfully');
+            
+        } catch (e) {
+            console.error('Error in editPrice:', e);
+            alert('Error loading edit form: ' + e.message);
+        }
+    }, 100);
 }
+
+// Add event handlers when document is ready
+$(document).ready(function() {
+    console.log('Document ready, adding event handlers');
+    
+    // Alternative event handler for edit buttons
+    $(document).on('click', '.btn-warning', function(e) {
+        const onclick = $(this).attr('onclick');
+        if (onclick && onclick.includes('editPrice')) {
+            console.log('Edit button clicked via event handler');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Extract parameters from onclick attribute
+            const match = onclick.match(/editPrice\((\d+),\s*'([^']+)',\s*(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)\)/);
+            if (match) {
+                const agentId = parseInt(match[1]);
+                const profileName = match[2];
+                const buyPrice = parseFloat(match[3]);
+                const sellPrice = parseFloat(match[4]);
+                editPrice(agentId, profileName, buyPrice, sellPrice);
+            }
+        }
+    });
+    
+    // Add click handler for modal backdrop
+    $(document).on('click', '#priceAddModal', function(e) {
+        if (e.target === this) {
+            hideAddPriceModal();
+        }
+    });
+    
+    // Add ESC key handler
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && $('#priceAddModal').is(':visible')) {
+            hideAddPriceModal();
+        }
+    });
+});
 </script>

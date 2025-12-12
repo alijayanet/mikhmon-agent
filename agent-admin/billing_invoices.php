@@ -327,6 +327,40 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                 <h3><i class="fa fa-file-text-o"></i> Tagihan & Pembayaran</h3>
             </div>
             <div class="card-body">
+                <!-- Summary Boxes -->
+                <div class="row mb-3">
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-blue bmh-75">
+                            <h1><?= number_format($summary['total'], 0); ?>
+                                <span style="font-size: 15px;">total</span>
+                            </h1>
+                            <div><i class="fa fa-list"></i> Periode <?= htmlspecialchars($currentPeriod); ?></div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-green bmh-75">
+                            <h1><?= number_format($summary['paid'], 0); ?>
+                                <span style="font-size: 15px;">paid</span>
+                            </h1>
+                            <div><i class="fa fa-check"></i> Sudah Dibayar</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-red bmh-75">
+                            <h1><?= number_format($summary['unpaid'], 0); ?>
+                                <span style="font-size: 15px;">unpaid</span>
+                            </h1>
+                            <div><i class="fa fa-times"></i> Belum Bayar</div>
+                        </div>
+                    </div>
+                    <div class="col-3 col-box-6">
+                        <div class="box bg-yellow bmh-75">
+                            <h1><?= number_format($summary['paid_amount'], 0, ',', '.'); ?></h1>
+                            <div><i class="fa fa-money"></i> Pendapatan</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card" style="margin-bottom: 25px;">
                     <div class="card-header">
                         <h3><i class="fa fa-search"></i> Cari Tagihan Pelanggan</h3>
@@ -450,39 +484,6 @@ $session = $_GET['session'] ?? ($_SESSION['session'] ?? '');
                                 </div>
                             <?php endif; ?>
                         <?php endif; ?>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-3 col-box-6">
-                        <div class="box bg-blue bmh-75">
-                            <h1><?= number_format($summary['total'], 0); ?>
-                                <span style="font-size: 15px;">total</span>
-                            </h1>
-                            <div><i class="fa fa-list"></i> Periode <?= htmlspecialchars($currentPeriod); ?></div>
-                        </div>
-                    </div>
-                    <div class="col-3 col-box-6">
-                        <div class="box bg-green bmh-75">
-                            <h1><?= number_format($summary['paid'], 0); ?>
-                                <span style="font-size: 15px;">paid</span>
-                            </h1>
-                            <div><i class="fa fa-check"></i> Sudah Dibayar</div>
-                        </div>
-                    </div>
-                    <div class="col-3 col-box-6">
-                        <div class="box bg-red bmh-75">
-                            <h1><?= number_format($summary['unpaid'], 0); ?>
-                                <span style="font-size: 15px;">unpaid</span>
-                            </h1>
-                            <div><i class="fa fa-times"></i> Belum Bayar</div>
-                        </div>
-                    </div>
-                    <div class="col-3 col-box-6">
-                        <div class="box bg-yellow bmh-75">
-                            <h1><?= number_format($summary['paid_amount'], 0, ',', '.'); ?></h1>
-                            <div><i class="fa fa-money"></i> Pendapatan</div>
-                        </div>
                     </div>
                 </div>
 

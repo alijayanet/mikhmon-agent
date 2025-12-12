@@ -92,6 +92,34 @@ $session = $_GET['session'] ?? '';
 </div>
 <div class="card-body">
     
+    <!-- Payment Gateway Summary -->
+    <div class="row mb-3">
+        <div class="col-4 col-box-6">
+            <div class="box bg-blue bmh-75 gateway-box" onclick="switchToTab('tripay')" style="cursor: pointer;">
+                <h1><?= isset($gateway_config['tripay']) && $gateway_config['tripay']['is_active'] ? 'ON' : 'OFF'; ?>
+                    <span style="font-size: 15px;"><?= isset($gateway_config['tripay']) && $gateway_config['tripay']['is_sandbox'] ? 'sandbox' : 'live'; ?></span>
+                </h1>
+                <div><i class="fa fa-credit-card"></i> Tripay Gateway</div>
+            </div>
+        </div>
+        <div class="col-4 col-box-6">
+            <div class="box bg-green bmh-75 gateway-box" onclick="switchToTab('xendit')" style="cursor: pointer;">
+                <h1><?= isset($gateway_config['xendit']) && $gateway_config['xendit']['is_active'] ? 'ON' : 'OFF'; ?>
+                    <span style="font-size: 15px;"><?= isset($gateway_config['xendit']) && $gateway_config['xendit']['is_sandbox'] ? 'sandbox' : 'live'; ?></span>
+                </h1>
+                <div><i class="fa fa-credit-card"></i> Xendit Gateway</div>
+            </div>
+        </div>
+        <div class="col-4 col-box-6">
+            <div class="box bg-yellow bmh-75 gateway-box" onclick="switchToTab('midtrans')" style="cursor: pointer;">
+                <h1><?= isset($gateway_config['midtrans']) && $gateway_config['midtrans']['is_active'] ? 'ON' : 'OFF'; ?>
+                    <span style="font-size: 15px;"><?= isset($gateway_config['midtrans']) && $gateway_config['midtrans']['is_sandbox'] ? 'sandbox' : 'live'; ?></span>
+                </h1>
+                <div><i class="fa fa-credit-card"></i> Midtrans Gateway</div>
+            </div>
+        </div>
+    </div>
+
     <?php if (isset($success_message)): ?>
     <div class="alert alert-success">
         <i class="fa fa-check-circle"></i> <?= $success_message; ?>
@@ -113,24 +141,20 @@ $session = $_GET['session'] ?? '';
     </div>
     <?php endif; ?>
     
-    <!-- Tabs -->
-    <ul class="nav nav-tabs" role="tablist">
-        <li class="nav-item">
-            <a class="nav-link active" data-toggle="tab" href="#tripay">
+    <!-- Compact Tabs -->
+    <div class="text-center mb-3">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-primary active" onclick="switchToTab('tripay')" id="tab-tripay">
                 <i class="fa fa-credit-card"></i> Tripay
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-toggle="tab" href="#xendit">
+            </button>
+            <button type="button" class="btn btn-outline-success" onclick="switchToTab('xendit')" id="tab-xendit">
                 <i class="fa fa-credit-card"></i> Xendit
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" data-toggle="tab" href="#midtrans">
+            </button>
+            <button type="button" class="btn btn-outline-warning" onclick="switchToTab('midtrans')" id="tab-midtrans">
                 <i class="fa fa-credit-card"></i> Midtrans
-            </a>
-        </li>
-    </ul>
+            </button>
+        </div>
+    </div>
     
     <div class="tab-content" style="padding-top: 20px;">
         
@@ -333,11 +357,75 @@ $session = $_GET['session'] ?? '';
 </div>
 </div>
 
+<style>
+.gateway-box {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.gateway-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+.gateway-box:active {
+    transform: translateY(0);
+}
+
+.btn-group .btn.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.btn-group .btn {
+    margin: 0;
+    border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+    border-top-left-radius: 0.25rem;
+    border-bottom-left-radius: 0.25rem;
+}
+
+.btn-group .btn:last-child {
+    border-top-right-radius: 0.25rem;
+    border-bottom-right-radius: 0.25rem;
+}
+</style>
+
 <script>
-// Bootstrap tabs (if not already loaded)
+// Function to switch tabs when box is clicked
+function switchToTab(tabId) {
+    // Remove active class from all tab buttons and tab panes
+    $('.btn-group .btn').removeClass('active');
+    $('.tab-pane').removeClass('show active');
+    
+    // Add active class to clicked tab button and corresponding pane
+    $('#tab-' + tabId).addClass('active');
+    $('#' + tabId).addClass('show active');
+    
+    // Smooth scroll to tabs section
+    $('html, body').animate({
+        scrollTop: $('.btn-group').offset().top - 20
+    }, 500);
+}
+
+// Initialize button group navigation
 $(document).ready(function(){
-    $('.nav-tabs a').click(function(){
-        $(this).tab('show');
+    // Handle button group clicks
+    $('.btn-group .btn').click(function(){
+        $('.btn-group .btn').removeClass('active');
+        $(this).addClass('active');
+    });
+    
+    // Add click effect to gateway boxes
+    $('.gateway-box').on('click', function() {
+        $(this).addClass('clicked');
+        setTimeout(() => {
+            $(this).removeClass('clicked');
+        }, 200);
     });
 });
 </script>
