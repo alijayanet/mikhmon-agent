@@ -135,8 +135,14 @@ function ensureTable($pdo, $name, $ddl) {
         if (strpos($ddl, 'CONSTRAINT') !== false && strpos($ddl, 'FOREIGN KEY') !== false) {
             logMessage("Tabel $name memiliki foreign key constraints, membuat tanpa constraints dulu...", 'info');
             
-            // Remove foreign key constraints from DDL
-            $ddlWithoutFK = preg_replace('/,\s*CONSTRAINT\s+`[^`]+`\s+FOREIGN\s+KEY[^,)]+(?:,|(?=\s*\)\s*ENGINE))/i', '', $ddl);
+            // Remove ALL constraints from DDL to ensure clean table creation
+            // This is a more aggressive approach to avoid foreign key issues
+            $ddlWithoutFK = preg_replace('/,\s*CONSTRAINT\s+`[^`]+`\s+FOREIGN\s+KEY[^\n]*,/i', ',', $ddl);
+            $ddlWithoutFK = preg_replace('/,\s*CONSTRAINT\s+`[^`]+`\s+FOREIGN\s+KEY[^\n]*\)[^\n]*;/i', ');', $ddlWithoutFK);
+            $ddlWithoutFK = preg_replace('/,\s*CONSTRAINT\s+`[^`]+`\s+FOREIGN\s+KEY[^\n]*(?=\)[^\n]*ENGINE)/i', '', $ddlWithoutFK);
+            // Also remove any remaining CONSTRAINT definitions
+            $ddlWithoutFK = preg_replace('/,\s*CONSTRAINT\s+`[^`]+`\s+[^,]*?(?=,)/i', ',', $ddlWithoutFK);
+            $ddlWithoutFK = preg_replace('/,\s*CONSTRAINT\s+`[^`]+`\s+[^\n]*?(?=\)[^\n]*ENGINE)/i', '', $ddlWithoutFK);
             
             try {
                 $pdo->exec($ddlWithoutFK);
@@ -800,6 +806,10 @@ function fixCollationIssues($pdo) {
                         
                         logMessage('Memulai proses instalasi...', 'info');
                         
+                        // Disable Foreign Key Checks temporarily
+                        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+                        
                         // 1. Define Tables
                         $tables = [
                             'agents' => "CREATE TABLE `agents` (
@@ -834,7 +844,6 @@ function fixCollationIssues($pdo) {
                                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                                 `updated_by` VARCHAR(50),
-                                CONSTRAINT `fk_agent_settings_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents`(`id`) ON DELETE CASCADE,
                                 UNIQUE KEY `unique_agent_setting` (`agent_id`, `setting_key`)
                             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
                             
@@ -1406,10 +1415,110 @@ function fixCollationIssues($pdo) {
                         ensureColumn($pdo, 'payment_methods', 'icon_url', 'VARCHAR(255) DEFAULT NULL', 'icon');
                         ensureColumn($pdo, 'payment_methods', 'config', 'TEXT', 'sort_order');
                         
-                        if (!columnExists($pdo, 'agent_settings', 'agent_id')) {
-                            $pdo->exec("ALTER TABLE `agent_settings` ADD COLUMN `agent_id` INT NOT NULL DEFAULT 1 AFTER `id`");
-                            $pdo->exec("ALTER TABLE `agent_settings` ADD CONSTRAINT `fk_agent_settings_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents`(`id`) ON DELETE CASCADE");
-                            logMessage('Kolom agent_settings.agent_id ditambahkan', 'success');
+                        // Completely avoid foreign key issues by ensuring clean setup
+                        try {
+                            logMessage('Memulai penyiapan agent_settings...', 'info');
+                            
+                            // Ensure agents table exists and has at least one record
+                            if (!tableExists($pdo, 'agents')) {
+                                logMessage('Membuat tabel agents...', 'info');
+                                $agentsTable = "CREATE TABLE `agents` (
+                                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                    `agent_code` VARCHAR(20) NOT NULL,
+                                    `agent_name` VARCHAR(100) NOT NULL,
+                                    `email` VARCHAR(100),
+                                    `phone` VARCHAR(20),
+                                    `password` VARCHAR(255),
+                                    `address` TEXT,
+                                    `balance` DECIMAL(15,2) DEFAULT 0.00,
+                                    `commission_rate` DECIMAL(5,2) DEFAULT 0.00,
+                                    `status` ENUM('active','inactive','suspended') DEFAULT 'active',
+                                    `level` ENUM('bronze','silver','gold','platinum') DEFAULT 'bronze',
+                                    `created_by` VARCHAR(50),
+                                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                    `last_login` TIMESTAMP NULL,
+                                    `notes` TEXT,
+                                    UNIQUE KEY `unique_agent_code` (`agent_code`),
+                                    KEY `idx_agent_code` (`agent_code`),
+                                    KEY `idx_status` (`status`)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+                                $pdo->exec($agentsTable);
+                                logMessage('Tabel agents berhasil dibuat', 'success');
+                            }
+                            
+                            // Ensure at least one agent exists
+                            $stmt = $pdo->prepare("SELECT COUNT(*) FROM agents");
+                            $stmt->execute();
+                            $agentCount = $stmt->fetchColumn();
+                            logMessage("Jumlah agent dalam database: $agentCount", 'info');
+                            
+                            if ($agentCount == 0) {
+                                logMessage('Membuat agent default...', 'info');
+                                $agentId = ensureAgent($pdo, 'AG001', 'Agent Demo');
+                                if (!$agentId) {
+                                    throw new Exception("Gagal membuat atau mengambil ID Agent Demo");
+                                }
+                                logMessage("Agent default dibuat dengan ID: $agentId", 'success');
+                            }
+                            
+                            // Get first agent ID
+                            $stmt = $pdo->prepare("SELECT id FROM agents ORDER BY id LIMIT 1");
+                            $stmt->execute();
+                            $firstAgentId = $stmt->fetchColumn() ?: 1;
+                            logMessage("Menggunakan agent ID: $firstAgentId", 'info');
+                            
+                            // Check if agent_settings table exists
+                            if (tableExists($pdo, 'agent_settings')) {
+                                logMessage('Memperbaiki tabel agent_settings yang ada...', 'info');
+                                
+                                // Drop foreign key constraint if it exists to prevent constraint violations
+                                try {
+                                    $stmt = $pdo->prepare("SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS 
+                                                          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agent_settings' 
+                                                          AND CONSTRAINT_NAME = 'fk_agent_settings_agent' AND CONSTRAINT_TYPE = 'FOREIGN KEY'");
+                                    $stmt->execute();
+                                    if ($stmt->rowCount() > 0) {
+                                        logMessage('Menghapus foreign key constraint fk_agent_settings_agent...', 'info');
+                                        $pdo->exec("ALTER TABLE `agent_settings` DROP FOREIGN KEY `fk_agent_settings_agent`");
+                                        logMessage('Foreign key constraint berhasil dihapus', 'success');
+                                    }
+                                } catch (Exception $e) {
+                                    // Silently ignore if constraint doesn't exist
+                                }
+                                
+                                // Update any rows with invalid agent_id
+                                $affectedRows = $pdo->exec("UPDATE `agent_settings` SET `agent_id` = $firstAgentId WHERE `agent_id` IS NULL OR `agent_id` = 0");
+                                if ($affectedRows > 0) {
+                                    logMessage("Baris agent_settings yang diperbaiki: $affectedRows", 'info');
+                                }
+
+                            } else {
+                                logMessage('Membuat tabel agent_settings...', 'info');
+                                // Create agent_settings table without foreign key constraint initially
+                                $agentSettingsTable = "CREATE TABLE `agent_settings` (
+                                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                    `agent_id` INT NOT NULL DEFAULT $firstAgentId,
+                                    `setting_key` VARCHAR(100) NOT NULL,
+                                    `setting_value` TEXT,
+                                    `setting_type` VARCHAR(20) DEFAULT 'string',
+                                    `description` TEXT,
+                                    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                    `updated_by` VARCHAR(50),
+                                    UNIQUE KEY `unique_agent_setting` (`agent_id`, `setting_key`)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+                                
+                                $pdo->exec($agentSettingsTable);
+                                logMessage('Tabel agent_settings berhasil dibuat', 'success');
+                            }
+                            
+                            logMessage('Tabel agent_settings siap', 'success');
+                        } catch (Exception $e) {
+                            // Only log critical errors, ignore duplicate entry errors
+                            if (strpos($e->getMessage(), 'Duplicate entry') === false) {
+                                logMessage('Error dalam penyiapan agent_settings: ' . $e->getMessage(), 'error');
+                            }
                         }
                         
                         ensureColumn($pdo, 'agent_settings', 'setting_type', "VARCHAR(20) DEFAULT 'string'", 'setting_value');
@@ -1512,6 +1621,10 @@ function fixCollationIssues($pdo) {
                         logMessage('Default pages created', 'success');
                         
                         logMessage('✅ INSTALASI SELESAI!', 'success');
+                        
+                        // Re-enable Foreign Key Checks
+                        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+
                         ?>
                     </div>
 
