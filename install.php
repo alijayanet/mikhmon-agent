@@ -50,26 +50,27 @@ define('DB_CHARSET', 'utf8mb4');
 
 // Create database connection
 function getDBConnection() {
-    static $conn = null;
+    static \$conn = null;
     
-    if ($conn === null) {
+    if (\$conn === null) {
         try {
-            $dsn = \"mysql:host=\" . DB_HOST . \";dbname=\" . DB_NAME . \";charset=\" . DB_CHARSET;
-            $options = [
+            \$dsn = \"mysql:host=\" . DB_HOST . \";dbname=\" . DB_NAME . \";charset=\" . DB_CHARSET;
+            \$options = array(
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
-            ];
-            $conn = new PDO($dsn, DB_USER, DB_PASS, $options);
-        } catch (PDOException $e) {
+            );
+            \$conn = new PDO(\$dsn, DB_USER, DB_PASS, \$options);
+        } catch (PDOException \$e) {
             error_log(\"Database connection failed: \" . \$e->getMessage());
             return false;
         }
     }
     
-    return $conn;
+    return \$conn;
 }
 ?>";
+
         
         // Write config file
         if (file_put_contents($configFile, $configContent)) {
