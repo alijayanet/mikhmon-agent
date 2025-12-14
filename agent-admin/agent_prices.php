@@ -140,6 +140,122 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
+
+/* Mobile-specific styles */
+.mobile-only {
+    display: none;
+}
+
+.desktop-only {
+    display: block;
+}
+
+/* Price card for mobile */
+.price-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.price-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.price-profile-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.price-profit {
+    font-size: 14px;
+    font-weight: bold;
+    color: #10b981;
+}
+
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13px;
+}
+
+.price-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.price-value {
+    text-align: right;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.price-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+    }
+    
+    .desktop-only {
+        display: none;
+    }
+    
+    /* Make table scrollable on small screens if needed */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Reduce padding on mobile */
+    .card-body {
+        padding: 10px;
+    }
+    
+    .price-card {
+        padding: 12px;
+    }
+    
+    /* Modal adjustments for mobile */
+    #priceAddModal > div {
+        width: 95%;
+        margin: 20px auto;
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .price-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .price-actions {
+        flex-direction: column;
+    }
+    
+    .price-actions .btn {
+        width: 100%;
+    }
+}
 </style>
 
 <div class="row">
@@ -224,8 +340,10 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
         <h3><i class="fa fa-user"></i> <?= htmlspecialchars($agt['agent_name']); ?> (<?= htmlspecialchars($agt['agent_code']); ?>)</h3>
     </div>
     <div class="card-body">
+    <!-- Desktop Table View -->
+    <div class="desktop-only">
     <div class="table-responsive">
-    <table class="table table-bordered table-hover text-nowrap">
+    <table class="table table-bordered table-hover">
         <thead>
             <tr>
                 <th>Profile</th>
@@ -240,11 +358,11 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
             <?php foreach ($agentPrices as $price): ?>
             <tr>
                 <td><strong><?= $price['profile_name']; ?></strong></td>
-                <td>Rp <?= number_format($price['buy_price'], 0, ',', '.'); ?></td>
-                <td>Rp <?= number_format($price['sell_price'], 0, ',', '.'); ?></td>
-                <td style="color: #10b981; font-weight: bold;">Rp <?= number_format($price['sell_price'] - $price['buy_price'], 0, ',', '.'); ?></td>
-                <td><?= date('d M Y', strtotime($price['updated_at'])); ?></td>
-                <td>
+                <td style="white-space: nowrap;">Rp <?= number_format($price['buy_price'], 0, ',', '.'); ?></td>
+                <td style="white-space: nowrap;">Rp <?= number_format($price['sell_price'], 0, ',', '.'); ?></td>
+                <td style="color: #10b981; font-weight: bold; white-space: nowrap;">Rp <?= number_format($price['sell_price'] - $price['buy_price'], 0, ',', '.'); ?></td>
+                <td style="white-space: nowrap;"><?= date('d M Y', strtotime($price['updated_at'])); ?></td>
+                <td style="white-space: nowrap;">
                     <button onclick="editPrice(<?= $agt['id']; ?>, '<?= $price['profile_name']; ?>', <?= $price['buy_price']; ?>, <?= $price['sell_price']; ?>)" 
                             class="btn btn-sm btn-warning" title="Edit">
                         <i class="fa fa-edit"></i>
@@ -259,6 +377,59 @@ $session = $_GET['session'] ?? (isset($session) ? $session : '');
             <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
+    </div>
+    
+    <!-- Mobile Card View -->
+    <div class="mobile-only">
+        <?php foreach ($agentPrices as $price): ?>
+        <div class="price-card">
+            <div class="price-card-header">
+                <div class="price-profile-name">
+                    <i class="fa fa-tag"></i> <?= $price['profile_name']; ?>
+                </div>
+                <div class="price-profit">
+                    +Rp <?= number_format($price['sell_price'] - $price['buy_price'], 0, ',', '.'); ?>
+                </div>
+            </div>
+            
+            <div class="price-row">
+                <span class="price-label">Harga Beli:</span>
+                <span class="price-value">Rp <?= number_format($price['buy_price'], 0, ',', '.'); ?></span>
+            </div>
+            
+            <div class="price-row">
+                <span class="price-label">Harga Jual:</span>
+                <span class="price-value">Rp <?= number_format($price['sell_price'], 0, ',', '.'); ?></span>
+            </div>
+            
+            <div class="price-row">
+                <span class="price-label">Profit:</span>
+                <span class="price-value" style="color: #10b981;">
+                    Rp <?= number_format($price['sell_price'] - $price['buy_price'], 0, ',', '.'); ?>
+                </span>
+            </div>
+            
+            <div class="price-row">
+                <span class="price-label">Terakhir Update:</span>
+                <span class="price-value" style="font-size: 12px; color: #6b7280;">
+                    <?= date('d M Y', strtotime($price['updated_at'])); ?>
+                </span>
+            </div>
+            
+            <div class="price-actions">
+                <button onclick="editPrice(<?= $agt['id']; ?>, '<?= $price['profile_name']; ?>', <?= $price['buy_price']; ?>, <?= $price['sell_price']; ?>)" 
+                        class="btn btn-sm btn-warning" title="Edit">
+                    <i class="fa fa-edit"></i> Edit
+                </button>
+                <a href="?hotspot=agent-prices&delete=<?= $price['id']; ?>&session=<?= $session; ?>" 
+                   onclick="return confirm('Yakin ingin menghapus harga untuk profile <?= $price['profile_name']; ?>?')"
+                   class="btn btn-sm btn-danger" title="Hapus">
+                    <i class="fa fa-trash"></i> Hapus
+                </a>
+            </div>
+        </div>
+        <?php endforeach; ?>
     </div>
     </div>
 </div>

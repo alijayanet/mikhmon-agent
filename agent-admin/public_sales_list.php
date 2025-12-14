@@ -91,6 +91,9 @@ try {
 $session = $_GET['session'] ?? '';
 ?>
 
+<!-- Include responsive tables CSS -->
+<link rel="stylesheet" href="./css/responsive-tables.css">
+
 <div class="row">
 <div class="col-12">
     
@@ -187,6 +190,8 @@ $session = $_GET['session'] ?? '';
             </div>
             
             <!-- Transactions Table -->
+            <!-- Desktop Table View -->
+            <div class="desktop-only">
             <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
                 <table class="table table-bordered table-striped table-hover" style="min-width: 1000px;">
                     <thead class="thead-dark">
@@ -260,6 +265,92 @@ $session = $_GET['session'] ?? '';
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+            </div>
+            
+            <!-- Mobile Card View -->
+            <div class="mobile-only">
+                <?php if (empty($transactions)): ?>
+                    <div class="alert alert-info"><i class="fa fa-info-circle"></i> No transactions found</div>
+                <?php else: ?>
+                    <?php foreach ($transactions as $trx): ?>
+                    <?php
+                    $badge_colors = [
+                        'pending' => 'warning',
+                        'paid' => 'success',
+                        'expired' => 'secondary',
+                        'failed' => 'danger'
+                    ];
+                    $badge_color = $badge_colors[$trx['status']] ?? 'secondary';
+                    ?>
+                    <div class="sale-card">
+                        <div class="sale-card-header">
+                            <div class="sale-reference">
+                                #<?= htmlspecialchars($trx['transaction_id']); ?>
+                            </div>
+                            <div class="sale-amount">
+                                Rp <?= number_format($trx['total_amount'], 0, ',', '.'); ?>
+                            </div>
+                        </div>
+                        
+                        <div class="data-row">
+                            <span class="data-label">Date:</span>
+                            <span class="data-value"><?= date('d/m/Y H:i', strtotime($trx['created_at'])); ?></span>
+                        </div>
+                        
+                        <div class="data-row">
+                            <span class="data-label">Customer:</span>
+                            <span class="data-value">
+                                <strong><?= htmlspecialchars($trx['customer_name']); ?></strong><br>
+                                <small><?= htmlspecialchars($trx['customer_phone']); ?></small>
+                            </span>
+                        </div>
+                        
+                        <div class="data-row">
+                            <span class="data-label">Agent:</span>
+                            <span class="data-value"><?= htmlspecialchars($trx['agent_name']); ?></span>
+                        </div>
+                        
+                        <div class="data-row">
+                            <span class="data-label">Package:</span>
+                            <span class="data-value"><?= htmlspecialchars($trx['profile_name']); ?></span>
+                        </div>
+                        
+                        <div class="data-row">
+                            <span class="data-label">Payment:</span>
+                            <span class="data-value"><?= htmlspecialchars($trx['payment_method'] ?? '-'); ?></span>
+                        </div>
+                        
+                        <div class="data-row">
+                            <span class="data-label">Status:</span>
+                            <span class="data-value">
+                                <span class="badge badge-<?= $badge_color; ?>"><?= ucfirst($trx['status']); ?></span>
+                            </span>
+                        </div>
+                        
+                        <?php if (!empty($trx['voucher_code'])): ?>
+                        <div class="data-row">
+                            <span class="data-label">Voucher:</span>
+                            <span class="data-value">
+                                <strong><?= htmlspecialchars($trx['voucher_code']); ?></strong><br>
+                                <small><?= htmlspecialchars($trx['voucher_password']); ?></small>
+                            </span>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div class="data-actions">
+                            <button class="btn btn-info btn-sm" onclick="viewDetail('<?= $trx['id']; ?>')">
+                                <i class="fa fa-eye"></i> View Detail
+                            </button>
+                            <?php if ($trx['status'] == 'paid' && empty($trx['voucher_code'])): ?>
+                            <button class="btn btn-warning btn-sm" onclick="generateVoucher('<?= $trx['id']; ?>')">
+                                <i class="fa fa-ticket"></i> Generate Voucher
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
             
         </div>

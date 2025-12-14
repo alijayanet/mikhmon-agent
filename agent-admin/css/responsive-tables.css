@@ -1,0 +1,482 @@
+/**
+ * Responsive Tables CSS
+ * Universal responsive table styles for MikhMon Agent Admin
+ * 
+ * Usage:
+ * 1. Include this CSS file in your page
+ * 2. Wrap desktop table with: <div class="desktop-only">
+ * 3. Add mobile cards with: <div class="mobile-only">
+ */
+
+/* ========================================
+   MOBILE/DESKTOP TOGGLE
+   ======================================== */
+
+.mobile-only {
+    display: none;
+}
+
+.desktop-only {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+    }
+    
+    .desktop-only {
+        display: none;
+    }
+}
+
+/* ========================================
+   GENERIC CARD STYLES
+   ======================================== */
+
+.data-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.data-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.data-card-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.data-card-subtitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.data-card-badge {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.data-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13px;
+}
+
+.data-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.data-value {
+    text-align: right;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.data-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* ========================================
+   TRANSACTION SPECIFIC STYLES
+   ======================================== */
+
+.transaction-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.transaction-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.transaction-date {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.transaction-amount {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.amount-positive {
+    color: #10b981;
+}
+
+.amount-negative {
+    color: #ef4444;
+}
+
+.transaction-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13px;
+}
+
+.transaction-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.transaction-value {
+    text-align: right;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+/* ========================================
+   PRICE SPECIFIC STYLES
+   ======================================== */
+
+.price-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.price-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.price-profile-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.price-profit {
+    font-size: 14px;
+    font-weight: bold;
+    color: #10b981;
+}
+
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13px;
+}
+
+.price-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.price-value {
+    text-align: right;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.price-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* ========================================
+   CUSTOMER/INVOICE SPECIFIC STYLES
+   ======================================== */
+
+.customer-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.customer-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.customer-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.customer-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+.status-active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-inactive {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-isolated {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* ========================================
+   PAYMENT METHOD STYLES
+   ======================================== */
+
+.method-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.method-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.method-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.method-type {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0c4a6e;
+}
+
+/* ========================================
+   SALES SPECIFIC STYLES
+   ======================================== */
+
+.sale-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.sale-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.sale-reference {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    font-family: 'Courier New', monospace;
+}
+
+.sale-amount {
+    font-size: 16px;
+    font-weight: bold;
+    color: #10b981;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Make table scrollable on small screens if needed */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Reduce padding on mobile */
+    .card-body {
+        padding: 10px;
+    }
+    
+    /* All card types */
+    .data-card,
+    .transaction-card,
+    .price-card,
+    .customer-card,
+    .method-card,
+    .sale-card {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Stack headers on very small screens */
+    .data-card-header,
+    .transaction-card-header,
+    .price-card-header,
+    .customer-card-header,
+    .method-card-header,
+    .sale-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    /* Full width actions */
+    .data-actions,
+    .price-actions {
+        flex-direction: column;
+    }
+    
+    .data-actions .btn,
+    .price-actions .btn {
+        width: 100%;
+    }
+    
+    /* Adjust font sizes */
+    .data-card-title,
+    .customer-name,
+    .method-name,
+    .price-profile-name {
+        font-size: 15px;
+    }
+    
+    .transaction-amount,
+    .sale-amount {
+        font-size: 15px;
+    }
+}
+
+/* ========================================
+   BADGE STYLES (CONSISTENT)
+   ======================================== */
+
+.badge-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+}
+
+.status-success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-failed {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.status-paid {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-unpaid {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-overdue {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-note {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #475569;
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+.text-success {
+    color: #10b981;
+}
+
+.text-danger {
+    color: #ef4444;
+}
+
+.text-warning {
+    color: #f59e0b;
+}
+
+.text-muted {
+    color: #6b7280;
+}
+
+.font-mono {
+    font-family: 'Courier New', monospace;
+}
+
+.nowrap {
+    white-space: nowrap;
+}

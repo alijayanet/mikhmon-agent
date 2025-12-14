@@ -52,6 +52,9 @@ try {
     $totalSpent = 0;
 }
 
+// Get agent prices for this agent
+$agentPrices = $agent->getAllAgentPrices($agentId);
+
 // Get user profiles from MikroTik for voucher generation
 include_once('../lib/routeros_api.class.php');
 include_once('../include/config.php');
@@ -282,6 +285,210 @@ include_once('include_nav.php');
         font-size: 10px !important;
     }
 }
+
+/* Price Cards Styles */
+.price-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.price-card-voucher {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 15px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.price-card-voucher:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border-color: #667eea;
+}
+
+.price-card-voucher.selected {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.price-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.profile-name {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+.price-card-voucher.selected .profile-name {
+    color: white;
+}
+
+.profit-badge {
+    background: #10b981;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.price-card-voucher.selected .profit-badge {
+    background: rgba(255,255,255,0.3);
+}
+
+.price-details {
+    margin: 15px 0;
+}
+
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.price-label {
+    color: #666;
+    font-weight: 500;
+}
+
+.price-card-voucher.selected .price-label {
+    color: rgba(255,255,255,0.9);
+}
+
+.price-value {
+    font-weight: bold;
+    color: #333;
+}
+
+.price-card-voucher.selected .price-value {
+    color: white;
+}
+
+.price-value.profit {
+    color: #10b981;
+    font-size: 16px;
+}
+
+.price-card-voucher.selected .price-value.profit {
+    color: #a7f3d0;
+}
+
+.select-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.price-card-voucher.selected .select-indicator {
+    opacity: 1;
+}
+
+.select-indicator i {
+    color: #667eea;
+    font-size: 16px;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.price-card-voucher.selected .quantity-controls {
+    border-top-color: rgba(255,255,255,0.3);
+}
+
+.quantity-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    border: 2px solid #667eea;
+    background: white;
+    color: #667eea;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quantity-btn:hover {
+    background: #667eea;
+    color: white;
+}
+
+.quantity-display {
+    flex: 1;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+.price-card-voucher.selected .quantity-display {
+    color: white;
+}
+
+.generate-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.customer-info-toggle {
+    margin-bottom: 15px;
+}
+
+.customer-fields {
+    display: none;
+    margin-top: 15px;
+}
+
+.customer-fields.active {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .price-cards-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .price-card-voucher {
+        padding: 15px;
+    }
+    
+    .profile-name {
+        font-size: 18px;
+    }
+}
 </style>
 
 <div class="row">
@@ -357,47 +564,87 @@ include_once('include_nav.php');
                 <h3><i class="fa fa-ticket"></i> Generate Voucher</h3>
             </div>
             <div class="card-body">
-                <form id="generateForm">
-                    <input type="hidden" name="agent_id" value="<?= $agentId; ?>">
-                    <input type="hidden" name="agent_token" value="<?= $_SESSION['agent_token']; ?>">
-                    
-                    <div class="form-group">
-                        <label>Profile</label>
-                        <select name="profile" class="form-control" required>
-                            <option value="">-- Select Profile --</option>
-                            <?php foreach ($profiles as $profile): ?>
-                            <option value="<?= htmlspecialchars($profile); ?>"><?= htmlspecialchars($profile); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                <?php if (empty($agentPrices)): ?>
+                    <div class="alert alert-warning">
+                        <i class="fa fa-exclamation-triangle"></i> Belum ada harga yang diset untuk agent Anda. Silakan hubungi admin.
+                    </div>
+                <?php else: ?>
+                    <!-- Price Cards Grid -->
+                    <div class="price-cards-grid">
+                        <?php foreach ($agentPrices as $price): ?>
+                        <div class="price-card-voucher" 
+                             data-profile="<?= htmlspecialchars($price['profile_name']); ?>"
+                             data-price="<?= $price['agent_price']; ?>"
+                             data-sell-price="<?= $price['sell_price']; ?>"
+                             data-profit="<?= $price['profit']; ?>"
+                             onclick="selectPriceCard(this)">
+                            
+                            <div class="select-indicator">
+                                <i class="fa fa-check"></i>
+                            </div>
+                            
+                            <div class="price-card-header">
+                                <div class="profile-name"><?= htmlspecialchars($price['profile_name']); ?></div>
+                                <div class="profit-badge">+Rp <?= number_format($price['profit'], 0, ',', '.'); ?></div>
+                            </div>
+                            
+                            <div class="price-details">
+                                <div class="price-row">
+                                    <span class="price-label">Harga Beli:</span>
+                                    <span class="price-value">Rp <?= number_format($price['agent_price'], 0, ',', '.'); ?></span>
+                                </div>
+                                <div class="price-row">
+                                    <span class="price-label">Harga Jual:</span>
+                                    <span class="price-value">Rp <?= number_format($price['sell_price'], 0, ',', '.'); ?></span>
+                                </div>
+                                <div class="price-row">
+                                    <span class="price-label">Profit Anda:</span>
+                                    <span class="price-value profit">Rp <?= number_format($price['profit'], 0, ',', '.'); ?></span>
+                                </div>
+                            </div>
+                            
+                            <div class="quantity-controls">
+                                <button type="button" class="quantity-btn" onclick="event.stopPropagation(); changeQuantity(this, -1)">-</button>
+                                <div class="quantity-display">1</div>
+                                <button type="button" class="quantity-btn" onclick="event.stopPropagation(); changeQuantity(this, 1)">+</button>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Quantity</label>
-                        <input type="number" name="quantity" class="form-control" min="1" max="100" value="1" required>
+                    <!-- Generate Section -->
+                    <div class="generate-section" id="generateSection" style="display: none;">
+                        <form id="generateForm">
+                            <input type="hidden" name="agent_id" value="<?= $agentId; ?>">
+                            <input type="hidden" name="agent_token" value="<?= $_SESSION['agent_token']; ?>">
+                            <input type="hidden" name="profile" id="selectedProfile">
+                            <input type="hidden" name="quantity" id="selectedQuantity" value="1">
+                            
+                            <div class="customer-info-toggle">
+                                <label style="cursor: pointer;">
+                                    <input type="checkbox" id="addCustomerInfo" onchange="toggleCustomerFields()">
+                                    Tambahkan Info Customer (Opsional)
+                                </label>
+                            </div>
+                            
+                            <div class="customer-fields" id="customerFields">
+                                <div class="form-group">
+                                    <label>Customer Phone</label>
+                                    <input type="text" name="customer_phone" class="form-control" placeholder="08123456789">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Customer Name</label>
+                                    <input type="text" name="customer_name" class="form-control" placeholder="Nama customer">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-block" id="generateBtn">
+                                <i class="fa fa-plus-circle"></i> Generate <span id="generateQtyText">1</span> Voucher
+                            </button>
+                        </form>
                     </div>
-                    
-                    <div class="form-group">
-                        <label>Customer Phone (Optional)</label>
-                        <input type="text" name="customer_phone" class="form-control" placeholder="Customer phone number">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Customer Name (Optional)</label>
-                        <input type="text" name="customer_name" class="form-control" placeholder="Customer name">
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-block" id="generateBtn">
-                        <i class="fa fa-plus-circle"></i> Generate Voucher
-                    </button>
-                </form>
-                
-                <div id="voucherResult" class="voucher-result">
-                    <h3><i class="fa fa-check-circle"></i> Generated Vouchers</h3>
-                    <div id="voucherList" class="voucher-list"></div>
-                    <div style="margin-top: 15px;">
-                        <strong>New Balance:</strong> <span id="newBalance">Rp 0</span>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -482,6 +729,7 @@ include_once('include_nav.php');
 
 <script>
     let generatedVouchers = [];
+    let selectedCard = null;
     
     // ISP and Agent info
     const ispName = "<?= addslashes($ispName); ?>";
@@ -489,6 +737,66 @@ include_once('include_nav.php');
     const agentName = "<?= addslashes($agentData['name']); ?>";
     const agentCode = "<?= addslashes($agentData['agent_code']); ?>";
     
+    // Price Card Selection
+    function selectPriceCard(card) {
+        // Remove selection from all cards
+        document.querySelectorAll('.price-card-voucher').forEach(c => {
+            c.classList.remove('selected');
+        });
+        
+        // Select this card
+        card.classList.add('selected');
+        selectedCard = card;
+        
+        // Update hidden form fields
+        document.getElementById('selectedProfile').value = card.dataset.profile;
+        
+        // Get quantity from this card
+        const qty = parseInt(card.querySelector('.quantity-display').textContent);
+        document.getElementById('selectedQuantity').value = qty;
+        document.getElementById('generateQtyText').textContent = qty;
+        
+        // Show generate section
+        document.getElementById('generateSection').style.display = 'block';
+        
+        // Scroll to generate section
+        document.getElementById('generateSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    // Quantity Controls
+    function changeQuantity(btn, delta) {
+        const card = btn.closest('.price-card-voucher');
+        const display = card.querySelector('.quantity-display');
+        let currentQty = parseInt(display.textContent);
+        
+        currentQty += delta;
+        
+        // Min 1, Max 100
+        if (currentQty < 1) currentQty = 1;
+        if (currentQty > 100) currentQty = 100;
+        
+        display.textContent = currentQty;
+        
+        // Update form if this card is selected
+        if (card.classList.contains('selected')) {
+            document.getElementById('selectedQuantity').value = currentQty;
+            document.getElementById('generateQtyText').textContent = currentQty;
+        }
+    }
+    
+    // Toggle Customer Fields
+    function toggleCustomerFields() {
+        const checkbox = document.getElementById('addCustomerInfo');
+        const fields = document.getElementById('customerFields');
+        
+        if (checkbox.checked) {
+            fields.classList.add('active');
+        } else {
+            fields.classList.remove('active');
+        }
+    }
+    
+    // Form Submit Handler
     document.getElementById('generateForm').addEventListener('submit', function(e) {
         e.preventDefault();
         

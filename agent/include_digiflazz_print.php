@@ -343,6 +343,23 @@ if (!defined('DIGIFLAZZ_PRINT_COMPONENT')) {
             const messageBlock = payload.message ? `<div class="note">${payload.message}</div>` : '';
             // Show only the sell price (manually entered price)
             const sellPriceDisplay = payload.sellPrice > 0 ? `Rp ${formatCurrency(payload.sellPrice)}` : 'Rp 0';
+            
+            // Extract SKU/nominal from product name (e.g., "Pulsa Telkomsel 10k" -> "10k" or "x10")
+            const productName = payload.product || '-';
+            let skuNominal = '';
+            
+            // Try to extract nominal patterns like: 5k, 10k, 25k, 50k, 100k, x5, x10, x25, etc.
+            const nominalMatch = productName.match(/\b(x?\d+k?)\b/i);
+            if (nominalMatch) {
+                skuNominal = nominalMatch[1].toUpperCase();
+                // If it's just a number with k, convert to proper format
+                if (/^\d+k$/i.test(skuNominal)) {
+                    const num = parseInt(skuNominal);
+                    if (num >= 1000) {
+                        skuNominal = (num / 1000) + 'K';
+                    }
+                }
+            }
 
             if (options.thermal) {
                 return `<!DOCTYPE html>
@@ -363,6 +380,9 @@ if (!defined('DIGIFLAZZ_PRINT_COMPONENT')) {
         .status { font-weight: bold; margin: 6px 0; text-transform: uppercase; }
         .note { margin-top: 6px; font-size: 10px; text-align: left; }
         .footer { margin-top: 10px; font-size: 10px; }
+        .nominal-box { background: #f0f0f0; border: 1px solid #000; padding: 6px; margin: 6px 0; text-align: center; }
+        .nominal-sku { font-weight: bold; font-size: 16px; margin-bottom: 3px; }
+        .nominal-price { font-size: 11px; }
     </style>
 </head>
 <body>
@@ -373,11 +393,15 @@ if (!defined('DIGIFLAZZ_PRINT_COMPONENT')) {
         <div class="section">
             <div class="row"><span class="label">Tanggal</span><span class="value">${formattedDate} ${formattedTime}</span></div>
             <div class="row"><span class="label">Ref ID</span><span class="value">${payload.ref}</span></div>
-            <div class="row"><span class="label">Produk</span><span class="value">${payload.product || '-'}</span></div>
+            <div class="row"><span class="label">Produk</span><span class="value">${productName}</span></div>
             <div class="row"><span class="label">Nomor</span><span class="value">${payload.customerNo || '-'}</span></div>
-            <div class="row"><span class="label">Harga</span><span class="value">${sellPriceDisplay}</span></div>
-            ${payload.serial ? `<div class="row"><span class="label">Serial</span><span class="value">${payload.serial}</span></div>` : ''}
         </div>
+        <div class="separator"></div>
+        <div class="nominal-box">
+            ${skuNominal ? `<div class="nominal-sku">NOMINAL: ${skuNominal}</div>` : ''}
+            <div class="nominal-price">Harga: ${sellPriceDisplay}</div>
+        </div>
+        ${payload.serial ? `<div class="section"><div class="row"><span class="label">Serial</span><span class="value">${payload.serial}</span></div></div>` : ''}
         <div class="separator"></div>
         <div class="status">Status: ${payload.statusLabel}</div>
         ${messageBlock}

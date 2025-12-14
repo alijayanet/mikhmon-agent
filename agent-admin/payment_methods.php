@@ -93,6 +93,9 @@ $type_icons = [
 ];
 ?>
 
+<!-- Include responsive tables CSS -->
+<link rel="stylesheet" href="./css/responsive-tables.css">
+
 <div class="row">
     <div class="col-12">
         <div class="card">
@@ -242,6 +245,8 @@ $type_icons = [
                         </h3>
                     </div>
                     <div class="card-body p-0">
+                        <!-- Desktop Table View -->
+                        <div class="desktop-only">
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped">
                                 <thead>
@@ -314,6 +319,89 @@ $type_icons = [
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                        </div>
+                        </div>
+                        
+                        <!-- Mobile Card View -->
+                        <div class="mobile-only" style="padding: 10px;">
+                            <?php foreach ($methods as $method): ?>
+                            <div class="method-card">
+                                <div class="method-card-header">
+                                    <div class="method-name">
+                                        <i class="fa <?= $method['icon'] ?? 'fa-credit-card'; ?>"></i>
+                                        <?= htmlspecialchars($method['method_name']); ?>
+                                    </div>
+                                    <div class="method-type">
+                                        <?= htmlspecialchars($method['method_code']); ?>
+                                    </div>
+                                </div>
+                                
+                                <form method="POST" style="margin: 0;">
+                                    <input type="hidden" name="action" value="update_method">
+                                    <input type="hidden" name="id" value="<?= $method['id']; ?>">
+                                    
+                                    <div class="data-row">
+                                        <span class="data-label">Current Fee:</span>
+                                        <span class="data-value">
+                                            <span class="badge badge-info">
+                                                <?= $method['admin_fee_type'] === 'percentage' ? $method['admin_fee_value'] . '%' : 'Rp ' . number_format($method['admin_fee_value']); ?>
+                                            </span>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="data-row">
+                                        <span class="data-label">Fee Type:</span>
+                                        <span class="data-value">
+                                            <select name="admin_fee_type" class="form-control form-control-sm" style="width: auto; display: inline-block;">
+                                                <option value="fixed" <?= $method['admin_fee_type'] === 'fixed' ? 'selected' : ''; ?>>Fixed</option>
+                                                <option value="percentage" <?= $method['admin_fee_type'] === 'percentage' ? 'selected' : ''; ?>>Percentage</option>
+                                            </select>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="data-row">
+                                        <span class="data-label">Fee Value:</span>
+                                        <span class="data-value">
+                                            <input type="number" name="admin_fee_value" class="form-control form-control-sm" 
+                                                   value="<?= $method['admin_fee_value']; ?>" step="0.01" min="0" style="width: 100px; display: inline-block;">
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="data-row">
+                                        <span class="data-label">Min Amount:</span>
+                                        <span class="data-value">
+                                            <input type="number" name="min_amount" class="form-control form-control-sm" 
+                                                   value="<?= $method['min_amount']; ?>" placeholder="0" style="width: 100px; display: inline-block;">
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="data-row">
+                                        <span class="data-label">Max Amount:</span>
+                                        <span class="data-value">
+                                            <input type="number" name="max_amount" class="form-control form-control-sm" 
+                                                   value="<?= $method['max_amount']; ?>" placeholder="0" style="width: 100px; display: inline-block;">
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="data-row">
+                                        <span class="data-label">Status:</span>
+                                        <span class="data-value">
+                                            <div class="form-check" style="display: inline-block;">
+                                                <input type="checkbox" name="is_active" class="form-check-input" 
+                                                       <?= $method['is_active'] ? 'checked' : ''; ?>>
+                                                <label class="form-check-label">Active</label>
+                                            </div>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="data-actions">
+                                        <button type="submit" class="btn btn-success btn-sm" style="width: 100%;">
+                                            <i class="fa fa-save"></i> Update Method
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>

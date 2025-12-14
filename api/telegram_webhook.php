@@ -18,6 +18,10 @@ require_once(__DIR__ . '/../include/telegram_config.php');
 require_once(__DIR__ . '/telegram_mikrotik_helpers.php');
 // Load Digiflazz helper functions
 require_once(__DIR__ . '/telegram_digiflazz_helpers.php');
+// Load Digiflazz price list helpers
+if (file_exists(__DIR__ . '/telegram_digiflazz_price_helpers.php')) {
+    require_once(__DIR__ . '/telegram_digiflazz_price_helpers.php');
+}
 // Load WiFi helper functions
 require_once(__DIR__ . '/telegram_wifi_helpers.php');
 
@@ -394,6 +398,81 @@ function processTelegramCommand($chatId, $message, $username = '', $firstName = 
         return;
     }
     
+    // Command: HARGA PULSA - Tampilkan daftar harga pulsa
+    if (in_array($messageLower, ['harga pulsa', 'list pulsa'])) {
+        if (function_exists('showTelegramDigiflazzPriceList')) {
+            showTelegramDigiflazzPriceList($chatId, 'Pulsa');
+        } else {
+            sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+        }
+        return;
+    }
+    
+    // Command: HARGA DATA - Tampilkan daftar harga paket data
+    if (in_array($messageLower, ['harga data', 'list data', 'paket data'])) {
+        if (function_exists('showTelegramDigiflazzPriceList')) {
+            showTelegramDigiflazzPriceList($chatId, 'Data');
+        } else {
+            sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+        }
+        return;
+    }
+    
+    // Command: HARGA EMONEY - Tampilkan daftar harga e-money
+    if (in_array($messageLower, ['harga emoney', 'harga e-money', 'list emoney', 'emoney'])) {
+        if (function_exists('showTelegramDigiflazzPriceList')) {
+            showTelegramDigiflazzPriceList($chatId, 'E-Money');
+        } else {
+            sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+        }
+        return;
+    }
+    
+    // Command: HARGA GAME - Tampilkan daftar harga voucher game
+    if (in_array($messageLower, ['harga game', 'list game', 'voucher game'])) {
+        if (function_exists('showTelegramDigiflazzPriceList')) {
+            showTelegramDigiflazzPriceList($chatId, 'Games');
+        } else {
+            sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+        }
+        return;
+    }
+    
+    // Command: HARGA PLN - Tampilkan daftar harga token PLN
+    if (in_array($messageLower, ['harga pln', 'list pln', 'token pln'])) {
+        if (function_exists('showTelegramDigiflazzPriceList')) {
+            showTelegramDigiflazzPriceList($chatId, 'PLN');
+        } else {
+            sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+        }
+        return;
+    }
+    
+    // Command: PRODUK DIGIFLAZZ - Tampilkan semua kategori
+    if (in_array($messageLower, ['produk digiflazz', 'list digiflazz', 'kategori digiflazz'])) {
+        if (function_exists('showTelegramDigiflazzCategories')) {
+            showTelegramDigiflazzCategories($chatId);
+        } else {
+            sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+        }
+        return;
+    }
+    
+    // Command: CARI <keyword> - Cari produk Digiflazz
+    if (strpos($messageLower, 'cari ') === 0) {
+        $keyword = trim(str_replace('cari ', '', $messageLower));
+        if (!empty($keyword)) {
+            if (function_exists('searchTelegramDigiflazzProducts')) {
+                searchTelegramDigiflazzProducts($chatId, $keyword);
+            } else {
+                sendTelegramMessage($chatId, "❌ Fitur ini belum tersedia.");
+            }
+        } else {
+            sendTelegramMessage($chatId, "❌ *FORMAT SALAH*\n\nFormat: CARI <keyword>\nContoh: CARI telkomsel\nContoh: CARI gopay");
+        }
+        return;
+    }
+    
     // User commands - PULSA
     if (strpos($messageLower, 'pulsa ') === 0) {
         $parts = explode(' ', $message);
@@ -420,6 +499,34 @@ function processTelegramCommand($chatId, $message, $username = '', $firstName = 
         $pass = trim(substr($message, 11)); // Remove "GANTISANDI "
         changeTelegramWiFiPassword($chatId, $pass);
         return;
+    }
+    
+    // Fallback: Check if this might be a Digiflazz SKU command (without "PULSA" prefix)
+    // Format: <SKU> <NOMOR>
+    // Example: as10 081234567890, xl5 087828060222
+    $parts = preg_split('/\s+/', $messageLower, 2);
+    if (count($parts) >= 2) {
+        $possibleSku = trim($parts[0]);
+        $possibleNumber = trim($parts[1]);
+        
+        // Check if first part looks like a SKU (alphanumeric, 2-20 chars)
+        // and second part looks like a phone number
+        if (preg_match('/^[a-z0-9_-]{2,20}$/i', $possibleSku) && 
+            preg_match('/^[0-9]{10,15}$/', preg_replace('/[^0-9]/', '', $possibleNumber))) {
+            
+            // Try to find product in database
+            if (function_exists('getDigiflazzProductBySKU')) {
+                $product = getDigiflazzProductBySKU($possibleSku);
+                
+                if ($product) {
+                    // This is a valid Digiflazz SKU, process it
+                    if (function_exists('purchaseTelegramDigiflazz')) {
+                        purchaseTelegramDigiflazz($chatId, $possibleSku, $possibleNumber);
+                        return; // Valid Digiflazz command processed
+                    }
+                }
+            }
+        }
     }
     
     // Default response for unknown commands
@@ -577,6 +684,106 @@ function isTelegramAdmin($chatId) {
 }
 
 /**
+ * Ultra-fast callback query answer (non-blocking)
+ * Gives instant visual feedback to user that button was pressed
+ */
+function fastTelegramCallback($callbackQueryId, $text = '⚡ Memproses...', $showAlert = false) {
+    $url = TELEGRAM_API_URL . '/answerCallbackQuery';
+    $postData = json_encode([
+        'callback_query_id' => $callbackQueryId,
+        'text' => $text,
+        'show_alert' => $showAlert
+    ]);
+    
+    // Ultra-fast non-blocking request
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $postData,
+            'timeout' => 0.1 // 100ms timeout for instant response
+        ]
+    ]);
+    
+    // Fire and forget - don't wait for response
+    @file_get_contents($url, false, $context);
+}
+
+/**
+ * Send typing indicator to show bot is processing
+ */
+function sendTelegramChatAction($chatId, $action = 'typing') {
+    $url = TELEGRAM_API_URL . '/sendChatAction';
+    $postData = json_encode([
+        'chat_id' => $chatId,
+        'action' => $action // typing, upload_photo, upload_document, etc.
+    ]);
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $postData,
+            'timeout' => 0.1
+        ]
+    ]);
+    
+    @file_get_contents($url, false, $context);
+}
+
+/**
+ * Send instant processing message based on action type
+ * Provides immediate feedback while actual processing happens
+ */
+function sendInstantProcessingMessage($chatId, $action, $parts = []) {
+    // Show typing indicator first
+    sendTelegramChatAction($chatId);
+    
+    // Prepare instant messages based on action
+    $messages = [
+        'generate_select' => '🎫 Memuat opsi voucher...',
+        'generate_bulk' => '📦 Memuat opsi bulk...',
+        'bulk_generate' => '🚀 Membuat voucher...',
+        'agent_packages' => '📋 Memuat daftar harga...',
+        'agent_generate' => '🎫 Memuat menu generate...',
+        'agent_quick' => '⚡ Memuat paket populer...',
+        'agent_billing' => '💳 Memuat menu billing...',
+        'agent_buy' => '🎫 Membuat voucher...',
+        'admin_buy' => '🎫 Membuat voucher...',
+        'generate_simple' => '⚡ Membuat voucher...',
+    ];
+    
+    $message = $messages[$action] ?? '⚡ Memproses...';
+    
+    // Add specific details if available
+    if (isset($parts[1])) {
+        $param = $parts[1];
+        if ($action === 'generate_select' || $action === 'generate_bulk' || $action === 'agent_buy' || $action === 'admin_buy') {
+            $message = "🎫 *" . strtoupper($param) . "*\n\n" . $message;
+        }
+    }
+    
+    // Ultra-fast message send
+    $url = TELEGRAM_API_URL . '/sendMessage';
+    $postData = json_encode([
+        'chat_id' => $chatId,
+        'text' => $message,
+        'parse_mode' => 'Markdown'
+    ]);
+    
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $postData,
+            'timeout' => 0.2 // Slightly longer for message delivery
+        ]
+    ]);
+    
+    @file_get_contents($url, false, $context);
+}
+
+/**
  * Handle callback query from inline keyboards
  */
 function handleCallbackQuery($chatId, $data, $callbackQueryId) {
@@ -615,8 +822,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             if (isset($parts[1])) {
                 try {
                     $profileName = $parts[1];
-                    // INSTANT response
-                    sendTelegramMessage($chatId, "🎫 *GENERATE VOUCHER*\n\n🔄 Sedang membuat voucher untuk paket: $profileName");
+                    // INSTANT typing indicator
+                    sendTelegramChatAction($chatId);
                     // Use optimized function for instant feedback
                     generateSingleVoucherOptimized($chatId, $profileName, false);
                 } catch (Exception $e) {
@@ -653,6 +860,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'agent_balance':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 $agent = getTelegramAgentByPhone($chatId);
                 if ($agent) {
                     $message = "💰 *INFO SALDO AGENT*\n\n";
@@ -671,6 +880,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'agent_menu':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 showTelegramAgentMenu($chatId);
             } catch (Exception $e) {
                 error_log("Error in agent_menu callback: " . $e->getMessage());
@@ -708,6 +919,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
         case 'generate_simple':
             if (isset($parts[1])) {
                 try {
+                    // INSTANT typing indicator
+                    sendTelegramChatAction($chatId);
                     $profileName = $parts[1];
                     // Use optimized function for instant feedback
                     generateSingleVoucherOptimized($chatId, $profileName, false);
@@ -767,6 +980,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
         case 'bulk_custom':
             if (isset($parts[1])) {
                 try {
+                    // INSTANT typing indicator
+                    sendTelegramChatAction($chatId);
                     $profileName = $parts[1];
                     $message = "📝 *CUSTOM BULK QUANTITY*\n\n";
                     $message .= "Ketik perintah:\n";
@@ -794,6 +1009,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'billing_search':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 $message = "🔍 *CARI PELANGGAN*\n\n";
                 $message .= "Ketik perintah:\n";
                 $message .= "`TAGIHAN [nama/hp]`\n\n";
@@ -839,6 +1056,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
         // Admin menu callbacks
         case 'admin_main':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 showTelegramAdminMenu($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_main callback: " . $e->getMessage());
@@ -848,6 +1067,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'admin_voucher':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 showTelegramAdminVoucherMenu($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_voucher callback: " . $e->getMessage());
@@ -857,6 +1078,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'admin_pppoe':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 showTelegramAdminPPPoEMenu($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_pppoe callback: " . $e->getMessage());
@@ -866,6 +1089,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'admin_settings':
             try {
+                // INSTANT typing indicator
+                sendTelegramChatAction($chatId);
                 showTelegramAdminSettingsMenu($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_settings callback: " . $e->getMessage());
@@ -877,8 +1102,8 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             if (isset($parts[1])) {
                 try {
                     $profileName = $parts[1];
-                    // INSTANT response
-                    sendTelegramMessage($chatId, "🎫 *GENERATE VOUCHER*\n\n🔄 Sedang membuat voucher untuk paket: $profileName");
+                    // INSTANT typing indicator
+                    sendTelegramChatAction($chatId);
                     // Use optimized function for admin
                     generateSingleVoucherOptimized($chatId, $profileName, true);
                 } catch (Exception $e) {

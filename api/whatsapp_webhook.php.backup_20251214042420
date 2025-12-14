@@ -25,11 +25,6 @@ if (file_exists(__DIR__ . '/whatsapp_wifi_commands.php')) {
     include_once(__DIR__ . '/whatsapp_wifi_commands.php');
 }
 
-// Load Digiflazz helpers module
-if (file_exists(__DIR__ . '/digiflazz_helpers.php')) {
-    include_once(__DIR__ . '/digiflazz_helpers.php');
-}
-
 // IMPORTANT: Save session config before overwriting $data
 // $data from config.php contains MikroTik session configuration
 if (!isset($data) || !is_array($data)) {
@@ -414,53 +409,6 @@ function processCommand($phone, $message) {
         }
         return; // Valid command processed
     }
-    // Command: HARGA PULSA - Tampilkan daftar harga pulsa
-    // Example: HARGA PULSA
-    elseif (in_array($messageLower, ['harga pulsa', 'list pulsa', 'pulsa'])) {
-        showDigiflazzPriceList($phone, 'Pulsa');
-        return;
-    }
-    // Command: HARGA DATA - Tampilkan daftar harga paket data
-    // Example: HARGA DATA
-    elseif (in_array($messageLower, ['harga data', 'list data', 'paket data'])) {
-        showDigiflazzPriceList($phone, 'Data');
-        return;
-    }
-    // Command: HARGA EMONEY - Tampilkan daftar harga e-money
-    // Example: HARGA EMONEY
-    elseif (in_array($messageLower, ['harga emoney', 'harga e-money', 'list emoney', 'emoney'])) {
-        showDigiflazzPriceList($phone, 'E-Money');
-        return;
-    }
-    // Command: HARGA GAME - Tampilkan daftar harga voucher game
-    // Example: HARGA GAME
-    elseif (in_array($messageLower, ['harga game', 'list game', 'voucher game'])) {
-        showDigiflazzPriceList($phone, 'Games');
-        return;
-    }
-    // Command: HARGA PLN - Tampilkan daftar harga token PLN
-    // Example: HARGA PLN
-    elseif (in_array($messageLower, ['harga pln', 'list pln', 'token pln'])) {
-        showDigiflazzPriceList($phone, 'PLN');
-        return;
-    }
-    // Command: PRODUK DIGIFLAZZ - Tampilkan semua kategori
-    // Example: PRODUK DIGIFLAZZ
-    elseif (in_array($messageLower, ['produk digiflazz', 'list digiflazz', 'kategori digiflazz'])) {
-        showDigiflazzCategories($phone);
-        return;
-    }
-    // Command: CARI <keyword> - Cari produk Digiflazz
-    // Example: CARI telkomsel, CARI gopay
-    elseif (strpos($messageLower, 'cari ') === 0) {
-        $keyword = trim(str_replace('cari ', '', $messageLower));
-        if (!empty($keyword)) {
-            searchDigiflazzProducts($phone, $keyword);
-        } else {
-            sendWhatsAppMessage($phone, "❌ *FORMAT SALAH*\n\nFormat: CARI <keyword>\nContoh: CARI telkomsel\nContoh: CARI gopay");
-        }
-        return;
-    }
     // Command: PULSA <SKU> <NOMER> - Beli produk Digiflazz (pulsa, data, e-money, games)
     // Example: PULSA as10 081234567890, PULSA xl5 087828060222
     elseif (strpos($messageLower, 'pulsa ') === 0) {
@@ -702,30 +650,6 @@ function processCommand($phone, $message) {
         elseif (in_array($messageLower, ['saldo digiflazz', 'cek saldo digiflazz', 'balance digiflazz'])) {
             checkDigiflazzBalance($phone);
             return;
-        }
-    }
-    
-    // Fallback: Check if this might be a Digiflazz SKU command (without "PULSA" prefix)
-    // Format: <SKU> <NOMOR>
-    // Example: as10 081234567890, xl5 087828060222
-    $parts = preg_split('/\s+/', $messageLower, 2);
-    if (count($parts) >= 2) {
-        $possibleSku = trim($parts[0]);
-        $possibleNumber = trim($parts[1]);
-        
-        // Check if first part looks like a SKU (alphanumeric, 2-20 chars)
-        // and second part looks like a phone number
-        if (preg_match('/^[a-z0-9_-]{2,20}$/i', $possibleSku) && 
-            preg_match('/^[0-9]{10,15}$/', preg_replace('/[^0-9]/', '', $possibleNumber))) {
-            
-            // Try to find product in database
-            $product = getDigiflazzProductBySKU($possibleSku);
-            
-            if ($product) {
-                // This is a valid Digiflazz SKU, process it
-                purchaseDigiflazz($phone, $possibleSku, $possibleNumber);
-                return; // Valid Digiflazz command processed
-            }
         }
     }
     
@@ -2320,14 +2244,7 @@ function sendHelp($phone) {
     
     $message .= "📝 *REG <NOMOR_HP>*\n";
     $message .= "Registrasi nomor agent/pelanggan\n";
-    $message .= "Contoh: REG 081234567890\n\n";    
-    $message .= "📱 *PULSA <SKU> <NOMOR>*\n";
-    $message .= "Beli pulsa/data/e-money/games via Digiflazz\n";
-    $message .= "Contoh: PULSA as10 081234567890\n";
-    $message .= "Contoh: PULSA xl5 087828060222\n";
-    $message .= "Contoh: PULSA gopay_10k 081234567890\n";
-    $message .= "Contoh: PULSA ff_50k 081234567890\n\n";
-    
+    $message .= "Contoh: REG 081234567890\n\n";
     
     // Admin-only commands
     $isAdmin = isWhatsAppAdmin($phone);

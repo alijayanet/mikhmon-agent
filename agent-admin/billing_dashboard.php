@@ -39,6 +39,10 @@ $revenueTrendStmt = $db->query("SELECT period, SUM(amount) AS total_amount, SUM(
 $revenueTrend = $revenueTrendStmt->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
+
+<!-- Include responsive tables CSS -->
+<link rel="stylesheet" href="./css/responsive-tables.css">
+
 <style>
 .billing-module {
     font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
@@ -138,16 +142,15 @@ $revenueTrend = $revenueTrendStmt->fetchAll(PDO::FETCH_ASSOC);
                                 <h3><i class="fa fa-calendar"></i> Tagihan Jatuh Tempo (7 Hari)</h3>
                             </div>
                             <div class="card-body table-responsive">
-                                <div class="d-block d-md-none" style="background: #fff3cd; padding: 8px 12px; margin-bottom: 10px; border-radius: 3px; font-size: 12px; color: #856404;">
-                                    <i class="fa fa-hand-o-right"></i> Geser tabel ke kanan untuk melihat semua kolom
-                                </div>
                                 <?php if (empty($upcomingDueInvoices)): ?>
                                     <div class="alert bg-light">Tidak ada tagihan jatuh tempo dalam 7 hari.</div>
                                 <?php else: ?>
+                                    <!-- Desktop Table View -->
+                                    <div class="desktop-only">
                                     <table class="table table-striped">
                                         <thead>
                                             <tr>
-                                                <th class="sticky-col">Pelanggan</th>
+                                                <th>Pelanggan</th>
                                                 <th>Tanggal Jatuh Tempo</th>
                                                 <th>Paket</th>
                                                 <th>Nominal</th>
@@ -157,7 +160,7 @@ $revenueTrend = $revenueTrendStmt->fetchAll(PDO::FETCH_ASSOC);
                                         <tbody>
                                             <?php foreach ($upcomingDueInvoices as $invoice): ?>
                                                 <tr>
-                                                    <td class="sticky-col"><?= htmlspecialchars($invoice['customer_name']); ?></td>
+                                                    <td><?= htmlspecialchars($invoice['customer_name']); ?></td>
                                                     <td><?= date('d M', strtotime($invoice['due_date'])); ?></td>
                                                     <td><?= htmlspecialchars($invoice['profile_name'] ?? '-'); ?></td>
                                                     <td>Rp <?= number_format($invoice['amount'], 0, ',', '.'); ?></td>
@@ -166,21 +169,40 @@ $revenueTrend = $revenueTrendStmt->fetchAll(PDO::FETCH_ASSOC);
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
-                                    <ul class="list-group">
+                                    </div>
+                                    
+                                    <!-- Mobile Card View -->
+                                    <div class="mobile-only">
                                         <?php foreach ($upcomingDueInvoices as $invoice): ?>
-                                            <li class="list-group-item" style="border-left: 4px solid #f0ad4e;">
-                                                <div style="display: flex; justify-content: space-between;">
-                                                    <strong><?= htmlspecialchars($invoice['customer_name']); ?></strong>
-                                                    <span><?= date('d M', strtotime($invoice['due_date'])); ?></span>
+                                        <div class="data-card" style="border-left: 4px solid #f0ad4e;">
+                                            <div class="data-card-header">
+                                                <div class="data-card-title">
+                                                    <i class="fa fa-user"></i> <?= htmlspecialchars($invoice['customer_name']); ?>
                                                 </div>
-                                                <div style="font-size: 12px; color: #666;">
-                                                    Paket: <?= htmlspecialchars($invoice['profile_name'] ?? '-'); ?><br>
-                                                    Nominal: Rp <?= number_format($invoice['amount'], 0, ',', '.'); ?><br>
-                                                    Status: <span class="badge badge-<?= $invoice['status']; ?>"><?= ucfirst($invoice['status']); ?></span>
+                                                <div class="data-card-subtitle">
+                                                    <?= date('d M', strtotime($invoice['due_date'])); ?>
                                                 </div>
-                                            </li>
+                                            </div>
+                                            
+                                            <div class="data-row">
+                                                <span class="data-label">Paket:</span>
+                                                <span class="data-value"><?= htmlspecialchars($invoice['profile_name'] ?? '-'); ?></span>
+                                            </div>
+                                            
+                                            <div class="data-row">
+                                                <span class="data-label">Nominal:</span>
+                                                <span class="data-value" style="font-weight: bold; color: #f0ad4e;">Rp <?= number_format($invoice['amount'], 0, ',', '.'); ?></span>
+                                            </div>
+                                            
+                                            <div class="data-row">
+                                                <span class="data-label">Status:</span>
+                                                <span class="data-value">
+                                                    <span class="badge badge-<?= $invoice['status']; ?>"><?= ucfirst($invoice['status']); ?></span>
+                                                </span>
+                                            </div>
+                                        </div>
                                         <?php endforeach; ?>
-                                    </ul>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                         </div>
