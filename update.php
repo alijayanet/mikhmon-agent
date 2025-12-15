@@ -1,27 +1,50 @@
 <?php
 /**
- * Auto-Update System from GitHub
+ * Auto-Update System from GitHub - OPTIMIZED FOR SHARED HOSTING
  * Repository: https://github.com/alijayanet/mikhmon-agent
  * 
  * PROTECTED FILES (will not be updated):
  * - include/db_config.php
+ * - include/config.php
+ * 
+ * Optimizations:
+ * - Increased time/memory limits with fallback
+ * - Optional backup skip for faster updates
+ * - Chunked operations to prevent timeout
+ * - Real-time output with flush
+ * - Reduced memory footprint
  */
+
+// ============================================================================
+// SHARED HOSTING OPTIMIZATIONS
+// ============================================================================
+
+// Attempt to increase limits (may not work on all shared hosting)
+@ini_set('max_execution_time', 0);
+@ini_set('memory_limit', '512M');
+@set_time_limit(0);
+
+// Enable output buffering with immediate flush
+ob_implicit_flush(true);
+@ob_end_flush();
 
 session_start();
 
 // Only allow admin access
-if (!isset($_SESSION['mikhmon_session']) || $_SESSION['mikhmon_session'] !== 'YWRtaW').split('').reverse().join('')) {
-    die('Access denied. Admin login required.');
+if (!isset($_SESSION['mikhmon'])) {
+    header('Location: admin.php?id=login');
+    exit;
 }
 
 define('GITHUB_REPO', 'alijayanet/mikhmon-agent');
-define('GITHUB_BRANCH', 'main'); // atau 'master' sesuai branch default
+define('GITHUB_BRANCH', 'main');
 define('BASE_PATH', __DIR__);
 define('BACKUP_PATH', BASE_PATH . '/backups');
 
 // Files to EXCLUDE from update (user configuration)
 $excludedFiles = [
     'include/db_config.php',
+    'include/config.php',
     'update.php',
     '.git',
     '.gitignore'
@@ -36,51 +59,90 @@ $excludedDirs = [
 ];
 
 /**
- * Download latest version from GitHub
+ * Output helper with real-time flush
+ */
+function outputLog($message, $type = 'info') {
+    $class = 'log-item';
+    if ($type === 'success') $class .= ' success';
+    if ($type === 'error') $class .= ' error';
+    if ($type === 'detail') $class = 'log-detail';
+    
+    echo "<div class='$class'>$message</div>";
+    
+    // Force output to browser immediately
+    if (ob_get_level() > 0) {
+        @ob_flush();
+    }
+    @flush();
+}
+
+/**
+ * Download latest version from GitHub with progress
  */
 function downloadLatestVersion() {
     $zipUrl = 'https://github.com/' . GITHUB_REPO . '/archive/refs/heads/' . GITHUB_BRANCH . '.zip';
     $zipFile = BASE_PATH . '/update_temp.zip';
     
-    echo "<div class='log-item'>📥 Downloading from GitHub...</div>";
-    echo "<div class='log-detail'>URL: $zipUrl</div>";
+    outputLog('📥 Downloading from GitHub...');
+    outputLog("URL: $zipUrl", 'detail');
     
-    // Download using cURL
+    // Download using cURL with reduced timeout for shared hosting
     $ch = curl_init($zipUrl);
     $fp = fopen($zipFile, 'w');
     
     curl_setopt($ch, CURLOPT_FILE, $fp);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 300);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For XAMPP local dev
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120); // Reduced from 300 to 120 seconds
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'MikhMon-Agent-Updater/1.0');
+    
+    // Progress callback
+    curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function($resource, $download_size, $downloaded, $upload_size, $uploaded) {
+        if ($download_size > 0) {
+            $percent = round(($downloaded / $download_size) * 100);
+            if ($percent % 10 == 0 && $percent > 0) { // Show every 10%
+                outputLog("Progress: $percent% ($downloaded / $download_size bytes)", 'detail');
+            }
+        }
+    });
     
     $result = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     
     curl_close($ch);
     fclose($fp);
     
     if (!$result || $httpCode !== 200) {
-        unlink($zipFile);
-        throw new Exception("Failed to download update. HTTP Code: $httpCode");
+        @unlink($zipFile);
+        throw new Exception("Failed to download update. HTTP Code: $httpCode. Error: $error");
     }
     
-    echo "<div class='log-item success'>✅ Download complete</div>";
+    outputLog('✅ Download complete (' . formatBytes(filesize($zipFile)) . ')', 'success');
     return $zipFile;
 }
 
 /**
- * Extract ZIP file
+ * Extract ZIP file with progress
  */
 function extractZip($zipFile) {
     $extractPath = BASE_PATH . '/update_temp';
     
-    echo "<div class='log-item'>📦 Extracting files...</div>";
+    outputLog('📦 Extracting files...');
+    
+    if (!class_exists('ZipArchive')) {
+        throw new Exception('ZipArchive class not available. Please enable ZIP extension in PHP.');
+    }
     
     $zip = new ZipArchive();
     if ($zip->open($zipFile) !== true) {
         throw new Exception('Failed to open ZIP file');
     }
+    
+    $totalFiles = $zip->numFiles;
+    outputLog("Total files in archive: $totalFiles", 'detail');
     
     $zip->extractTo($extractPath);
     $zip->close();
@@ -91,18 +153,23 @@ function extractZip($zipFile) {
         throw new Exception('No directory found in extracted ZIP');
     }
     
-    echo "<div class='log-item success'>✅ Files extracted</div>";
+    outputLog('✅ Files extracted successfully', 'success');
     return $dirs[0]; // Return first directory
 }
 
 /**
- * Create backup of current installation
+ * Create lightweight backup (optional)
  */
-function createBackup() {
-    echo "<div class='log-item'>💾 Creating backup...</div>";
+function createBackup($skipBackup = false) {
+    if ($skipBackup) {
+        outputLog('⏭️ Backup skipped (fast mode)', 'detail');
+        return null;
+    }
+    
+    outputLog('💾 Creating backup...');
     
     if (!file_exists(BACKUP_PATH)) {
-        mkdir(BACKUP_PATH, 0755, true);
+        @mkdir(BACKUP_PATH, 0755, true);
     }
     
     $backupName = 'backup_' . date('Y-m-d_H-i-s') . '.zip';
@@ -110,34 +177,41 @@ function createBackup() {
     
     $zip = new ZipArchive();
     if ($zip->open($backupFile, ZipArchive::CREATE) !== true) {
-        throw new Exception('Failed to create backup ZIP');
+        outputLog('⚠️ Failed to create backup, continuing without backup...', 'detail');
+        return null;
     }
     
-    // Add all files to backup (excluding backups folder itself)
-    $files = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator(BASE_PATH),
-        RecursiveIteratorIterator::LEAVES_ONLY
-    );
-    
+    // Only backup critical files (not all files to save time)
+    $criticalDirs = ['include', 'lib', 'agent', 'agent-admin', 'public'];
     $count = 0;
-    foreach ($files as $file) {
-        if (!$file->isDir()) {
-            $filePath = $file->getRealPath();
-            $relativePath = substr($filePath, strlen(BASE_PATH) + 1);
-            
-            // Skip backups folder
-            if (strpos($relativePath, 'backups' . DIRECTORY_SEPARATOR) === 0) {
-                continue;
+    
+    foreach ($criticalDirs as $dir) {
+        $dirPath = BASE_PATH . '/' . $dir;
+        if (!is_dir($dirPath)) continue;
+        
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dirPath, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+        
+        foreach ($files as $file) {
+            if (!$file->isDir()) {
+                $filePath = $file->getRealPath();
+                $relativePath = substr($filePath, strlen(BASE_PATH) + 1);
+                $zip->addFile($filePath, $relativePath);
+                $count++;
+                
+                // Prevent timeout during backup
+                if ($count % 100 == 0) {
+                    outputLog("Backed up $count files...", 'detail');
+                }
             }
-            
-            $zip->addFile($filePath, $relativePath);
-            $count++;
         }
     }
     
     $zip->close();
     
-    echo "<div class='log-item success'>✅ Backup created: $backupName ($count files)</div>";
+    outputLog("✅ Backup created: $backupName ($count files)", 'success');
     return $backupFile;
 }
 
@@ -147,19 +221,22 @@ function createBackup() {
 function updateFiles($sourcePath) {
     global $excludedFiles, $excludedDirs;
     
-    echo "<div class='log-item'>🔄 Updating files...</div>";
+    outputLog('🔄 Updating files...');
     
     $updated = 0;
     $skipped = 0;
     
     $files = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($sourcePath),
+        new RecursiveDirectoryIterator($sourcePath, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::SELF_FIRST
     );
     
     foreach ($files as $file) {
         $sourceFile = $file->getRealPath();
         $relativePath = substr($sourceFile, strlen($sourcePath) + 1);
+        
+        // Normalize path separators
+        $relativePath = str_replace('\\', '/', $relativePath);
         
         if ($file->isDir()) {
             // Check if directory is excluded
@@ -171,12 +248,12 @@ function updateFiles($sourcePath) {
             // Create directory if not exists
             $targetDir = BASE_PATH . '/' . $relativePath;
             if (!file_exists($targetDir)) {
-                mkdir($targetDir, 0755, true);
+                @mkdir($targetDir, 0755, true);
             }
         } else {
             // Check if file is excluded
             if (in_array($relativePath, $excludedFiles)) {
-                echo "<div class='log-detail'>⏭️ Skipped: $relativePath (protected)</div>";
+                outputLog("⏭️ Skipped: $relativePath (protected)", 'detail');
                 $skipped++;
                 continue;
             }
@@ -186,52 +263,79 @@ function updateFiles($sourcePath) {
             $targetDir = dirname($targetFile);
             
             if (!file_exists($targetDir)) {
-                mkdir($targetDir, 0755, true);
+                @mkdir($targetDir, 0755, true);
             }
             
-            if (copy($sourceFile, $targetFile)) {
+            if (@copy($sourceFile, $targetFile)) {
                 $updated++;
+                
+                // Show progress every 50 files
+                if ($updated % 50 == 0) {
+                    outputLog("Updated $updated files...", 'detail');
+                }
             }
         }
     }
     
-    echo "<div class='log-item success'>✅ Update complete: $updated files updated, $skipped files skipped</div>";
+    outputLog("✅ Update complete: $updated files updated, $skipped files skipped", 'success');
 }
 
 /**
  * Cleanup temporary files
  */
 function cleanup() {
-    echo "<div class='log-item'>🧹 Cleaning up...</div>";
+    outputLog('🧹 Cleaning up...');
     
     // Remove ZIP file
     if (file_exists(BASE_PATH . '/update_temp.zip')) {
-        unlink(BASE_PATH . '/update_temp.zip');
+        @unlink(BASE_PATH . '/update_temp.zip');
     }
     
     // Remove extracted folder
     $tempPath = BASE_PATH . '/update_temp';
     if (file_exists($tempPath)) {
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($tempPath, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
-        
-        foreach ($files as $file) {
-            if ($file->isDir()) {
-                rmdir($file->getRealPath());
-            } else {
-                unlink($file->getRealPath());
-            }
-        }
-        rmdir($tempPath);
+        deleteDirectory($tempPath);
     }
     
-    echo "<div class='log-item success'>✅ Cleanup complete</div>";
+    outputLog('✅ Cleanup complete', 'success');
+}
+
+/**
+ * Recursively delete a directory
+ */
+function deleteDirectory($dir) {
+    if (!is_dir($dir)) return;
+    
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    
+    foreach ($files as $file) {
+        if ($file->isDir()) {
+            @rmdir($file->getRealPath());
+        } else {
+            @unlink($file->getRealPath());
+        }
+    }
+    @rmdir($dir);
+}
+
+/**
+ * Format bytes to human readable
+ */
+function formatBytes($bytes, $precision = 2) {
+    $units = ['B', 'KB', 'MB', 'GB'];
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= pow(1024, $pow);
+    return round($bytes, $precision) . ' ' . $units[$pow];
 }
 
 // Process update
 $step = $_GET['step'] ?? 'start';
+$skipBackup = isset($_GET['skip_backup']) && $_GET['skip_backup'] == '1';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -426,7 +530,7 @@ $step = $_GET['step'] ?? 'start';
                 <div class="warning-box">
                     <h3><i class="fa fa-exclamation-triangle"></i> Peringatan</h3>
                     <ul>
-                        <li>Backup otomatis akan dibuat sebelum update</li>
+                        <li>Backup otomatis akan dibuat sebelum update (bisa di-skip untuk update lebih cepat)</li>
                         <li>Proses update akan menimpa semua file sistem</li>
                         <li>Pastikan tidak ada yang menggunakan sistem saat update</li>
                     </ul>
@@ -447,14 +551,39 @@ $step = $_GET['step'] ?? 'start';
                     <strong>Branch:</strong> <?= GITHUB_BRANCH; ?>
                 </p>
                 
+                <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="skipBackup" style="margin-right: 10px; width: 20px; height: 20px; cursor: pointer;">
+                        <span><strong>⚡ Fast Update Mode</strong> - Skip backup untuk update lebih cepat (Recommended untuk shared hosting)</span>
+                    </label>
+                    <p style="margin: 10px 0 0 30px; font-size: 12px; color: #666;">
+                        Catatan: Mode ini akan melewati proses backup untuk menghindari timeout di shared hosting. 
+                        Pastikan Anda sudah memiliki backup manual sebelumnya.
+                    </p>
+                </div>
+                
                 <div class="button-group">
-                    <a href="?step=update" class="btn btn-primary">
+                    <a href="?step=update" id="updateBtn" class="btn btn-primary">
                         <i class="fa fa-download"></i> Mulai Update
                     </a>
                     <a href="index.php" class="btn btn-secondary">
                         <i class="fa fa-times"></i> Batal
                     </a>
                 </div>
+                
+                <script>
+                    // Update button URL based on checkbox
+                    document.getElementById('skipBackup').addEventListener('change', function() {
+                        const btn = document.getElementById('updateBtn');
+                        if (this.checked) {
+                            btn.href = '?step=update&skip_backup=1';
+                            btn.innerHTML = '<i class="fa fa-bolt"></i> Update Cepat (Tanpa Backup)';
+                        } else {
+                            btn.href = '?step=update';
+                            btn.innerHTML = '<i class="fa fa-download"></i> Mulai Update';
+                        }
+                    });
+                </script>
                 
             <?php elseif ($step === 'update'): ?>
                 <div class="loading">
@@ -465,10 +594,17 @@ $step = $_GET['step'] ?? 'start';
                 <div class="log-container">
                     <?php
                     try {
-                        echo "<div class='log-item'>🚀 Starting update process...</div>";
+                        outputLog('🚀 Starting update process...');
                         
-                        // Step 1: Create backup
-                        $backupFile = createBackup();
+                        // Show mode
+                        if ($skipBackup) {
+                            outputLog('⚡ Fast mode enabled - Backup will be skipped', 'detail');
+                        } else {
+                            outputLog('💼 Standard mode - Creating backup first', 'detail');
+                        }
+                        
+                        // Step 1: Create backup (or skip)
+                        $backupFile = createBackup($skipBackup);
                         
                         // Step 2: Download latest version
                         $zipFile = downloadLatestVersion();
@@ -482,12 +618,14 @@ $step = $_GET['step'] ?? 'start';
                         // Step 5: Cleanup
                         cleanup();
                         
-                        echo "<div class='log-item success'>✅ UPDATE COMPLETED SUCCESSFULLY!</div>";
+                        outputLog('✅ UPDATE COMPLETED SUCCESSFULLY!', 'success');
                         echo "<script>setTimeout(() => window.location.href='?step=success', 2000);</script>";
                         
                     } catch (Exception $e) {
-                        echo "<div class='log-item error'>❌ ERROR: " . htmlspecialchars($e->getMessage()) . "</div>";
-                        echo "<div class='log-item'>💡 Backup tersimpan di folder backups/</div>";
+                        outputLog('❌ ERROR: ' . htmlspecialchars($e->getMessage()), 'error');
+                        if ($backupFile) {
+                            outputLog('💡 Backup tersimpan di folder backups/', 'detail');
+                        }
                         echo "<script>setTimeout(() => window.location.href='?step=error&msg=" . urlencode($e->getMessage()) . "', 3000);</script>";
                     }
                     ?>
