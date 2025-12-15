@@ -513,22 +513,23 @@ class Agent {
      * Get all agent prices
      */
     public function getAllAgentPrices($agentId) {
-        $sql = "SELECT 
-                    id,
-                    agent_id,
-                    profile_name,
-                    buy_price as agent_price,
-                    sell_price,
-                    (sell_price - buy_price) as profit,
-                    stock_limit,
-                    created_at,
-                    updated_at
-                FROM agent_prices 
-                WHERE agent_id = :agent_id 
-                ORDER BY profile_name";
+        $sql = "SELECT profile_name, buy_price, sell_price FROM agent_prices WHERE agent_id = :agent_id ORDER BY profile_name";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':agent_id' => $agentId]);
-        return $stmt->fetchAll();
+        $prices = $stmt->fetchAll();
+        
+        // Calculate profit and rename keys for consistency
+        $result = [];
+        foreach ($prices as $price) {
+            $result[] = [
+                'profile_name' => $price['profile_name'],
+                'agent_price' => $price['buy_price'],    // Harga beli agent
+                'sell_price' => $price['sell_price'],     // Harga jual ke customer
+                'profit' => $price['sell_price'] - $price['buy_price']  // Profit agent
+            ];
+        }
+        
+        return $result;
     }
     
     /**

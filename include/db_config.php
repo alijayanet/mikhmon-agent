@@ -20,11 +20,11 @@ function getDBConnection() {
     if ($conn === null) {
         try {
             $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-            $options = array(
+            $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
-            );
+            ];
             $conn = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
             // Log error
@@ -85,8 +85,8 @@ function initializeDatabase() {
 function testDBConnection() {
     $conn = getDBConnection();
     if ($conn) {
-        return array('success' => true, 'message' => 'Database connected successfully');
+        return ['success' => true, 'message' => 'Database connected successfully'];
     } else {
-        return array('success' => false, 'message' => 'Database connection failed');
+        return ['success' => false, 'message' => 'Database connection failed'];
     }
 }
