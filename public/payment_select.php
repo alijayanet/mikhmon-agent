@@ -346,24 +346,45 @@ $type_icons = [
             padding: 15px;
             font-size: 1.1rem;
             font-weight: 600;
-            background: var(--primary-color, #3c8dbc);
-            color: white;
+            background: var(--primary-color, #3c8dbc) !important;
+            color: white !important;
             border: none;
             border-radius: 10px;
             margin-top: 20px;
             transition: all 0.3s ease;
-        }
-        
-        .btn-pay:hover:not(:disabled) {
-            background: var(--primary-dark, #2c6aa0);
-            transform: translateY(-2px);
+            cursor: pointer;
             box-shadow: 0 4px 12px rgba(60, 141, 188, 0.3);
         }
         
+        .btn-pay:hover:not(:disabled) {
+            background: var(--primary-dark, #2c6aa0) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(60, 141, 188, 0.5);
+        }
+        
         .btn-pay:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background: var(--disabled-color, #ccc);
+            opacity: 0.6 !important;
+            cursor: not-allowed !important;
+            background: #999999 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Back button styling */
+        .back-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: var(--text-color, #333) !important;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            text-decoration: none;
         }
         
         /* Dark theme support */
@@ -379,9 +400,27 @@ $type_icons = [
                 --selected-bg: #1e3a5f;
                 --icon-bg: #404040;
             }
+            
+            .back-link {
+                color: #ffffff !important;
+            }
         }
         
+        /* Mobile specific fixes */
         @media (max-width: 768px) {
+            body {
+                padding: 10px 5px;
+            }
+            
+            .btn-pay {
+                padding: 14px;
+                font-size: 1rem;
+                position: sticky;
+                bottom: 10px;
+                z-index: 100;
+                box-sizing: border-box;
+            }
+            
             .payment-method {
                 flex-direction: column;
                 align-items: flex-start;
@@ -476,7 +515,7 @@ $type_icons = [
         </form>
         
         <div class="text-center mt-3">
-            <a href="index.php?agent=<?= urlencode($transaction['agent_code']); ?>" style="color: white;">
+            <a href="index.php?agent=<?= urlencode($transaction['agent_code']); ?>" class="back-link">
                 <i class="fa fa-arrow-left"></i> Kembali
             </a>
         </div>
