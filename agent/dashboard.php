@@ -123,6 +123,33 @@ include_once('include_nav.php');
 ?>
 
 <style>
+/* UNIVERSAL FIX - PREVENT ALL OVERFLOW */
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+/* Mobile specific container fix */
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden !important;
+    }
+    
+    .content-wrapper,
+    .row,
+    .col-12,
+    .card,
+    .card-body,
+    .dashboard-grid {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+}
+
 .balance-card {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -144,12 +171,14 @@ include_once('include_nav.php');
     margin: 15px 0;
 }
 
-/* Price Boxes Container - SIMPLE FLEXBOX */
+/* Price Boxes Container - FIXED FOR MOBILE */
 .price-boxes {
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
     margin: 20px 0;
+    width: 100%;
+    max-width: 100%;
 }
 
 .price-box {
@@ -225,51 +254,7 @@ include_once('include_nav.php');
     font-size: 16px;
 }
 
-/* Mobile Responsive - 1 KOLOM PENUH */
-@media (max-width: 768px) {
-    /* FIX HANYA Section Generate Voucher */
-    .price-boxes {
-        flex-direction: column;
-        gap: 10px;
-        max-width: 100%;
-        overflow: hidden;
-    }
-    
-    .price-box {
-        flex: 1 1 100%;
-        min-width: 100%;
-        max-width: 100%;
-        margin: 0;
-        box-sizing: border-box;
-    }
-    
-    /* FIX Recent Transactions Table */
-    .table-responsive {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
-        max-width: 100%;
-    }
-    
-    .table-responsive table {
-        min-width: 500px;
-        margin-bottom: 0;
-    }
-    
-    .balance-card {
-        padding: 20px 15px;
-        margin-bottom: 15px;
-    }
-    
-    .balance-amount {
-        font-size: 32px;
-    }
-    
-    .balance-label {
-        font-size: 12px;
-    }
-}
-
-/* Generate Section Styling - JELAS & MENONJOL */
+/* Generate Section Styling - FIXED OVERFLOW */
 .generate-section-box {
     display: none;
     margin-top: 25px;
@@ -278,6 +263,9 @@ include_once('include_nav.php');
     border-radius: 15px;
     border: 2px solid #667eea;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .generate-title {
@@ -321,12 +309,23 @@ include_once('include_nav.php');
     padding: 12px !important;
     font-size: 15px !important;
     color: #2d3748 !important;
+    background-color: #ffffff !important; /* White background */
     border-radius: 8px !important;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+.form-control-clear::placeholder {
+    color: #a0aec0 !important; /* Light gray placeholder */
+    opacity: 1 !important;
 }
 
 .form-control-clear:focus {
     border-color: #667eea !important;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+    outline: none !important;
+    background-color: #ffffff !important;
+    color: #2d3748 !important;
 }
 
 .button-center {
@@ -364,18 +363,9 @@ include_once('include_nav.php');
     font-size: 20px;
 }
 
-@media (max-width: 768px) {
-    .btn-generate-voucher {
-        width: 100%;
-        min-width: auto;
-        padding: 14px 30px;
-        font-size: 16px;
-    }
-}
-
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr; /* Single column - stack vertically */
     gap: 20px;
     margin-top: 20px;
 }
@@ -409,90 +399,98 @@ include_once('include_nav.php');
     font-weight: bold;
 }
 
+/* Table Responsive - FIXED FOR ALL DEVICES */
+.table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: -ms-autohiding-scrollbar;
+}
+
+.table-responsive > .table {
+    width: 100%;
+    min-width: 600px;
+    margin-bottom: 0;
+}
+
+.table-responsive .table th,
+.table-responsive .table td {
+    white-space: nowrap;
+    padding: 10px;
+    font-size: 13px;
+}
+
+/* Custom scrollbar untuk table */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* MOBILE RESPONSIVE - COMPREHENSIVE FIX */
 @media (max-width: 768px) {
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    /* Mobile responsive table for Recent Transactions */
+    /* Content wrapper fix untuk prevent overflow */
     .content-wrapper {
         padding-left: 10px !important;
         padding-right: 10px !important;
-        overflow-x: visible !important;
+        overflow-x: hidden !important;
+        max-width: 100% !important;
     }
     
     .row {
         margin-left: 0 !important;
         margin-right: 0 !important;
+        max-width: 100% !important;
     }
     
     .col-12 {
         padding-left: 0 !important;
         padding-right: 0 !important;
+        max-width: 100% !important;
     }
     
+    /* Card general fix */
     .card {
         margin-bottom: 10px !important;
         border-radius: 4px !important;
-    }
-    
-    .table-responsive {
-        overflow-x: auto !important;
-        overflow-y: visible !important;
-        -webkit-overflow-scrolling: touch !important;
-        width: 100% !important;
         max-width: 100% !important;
-        display: block !important;
-        margin: 0 !important;
-        -ms-overflow-style: -ms-autohiding-scrollbar !important;
-        position: relative !important;
+        overflow: visible !important;
     }
     
-    .table-responsive::-webkit-scrollbar {
-        height: 8px !important;
-        -webkit-appearance: none !important;
-    }
-    
-    .table-responsive::-webkit-scrollbar-track {
-        background: #f1f1f1 !important;
-        border-radius: 4px !important;
-    }
-    
-    .table-responsive::-webkit-scrollbar-thumb {
-        background: #888 !important;
-        border-radius: 4px !important;
-    }
-    
-    .table-responsive::-webkit-scrollbar-thumb:hover {
-        background: #555 !important;
-    }
-    
-    .table-responsive table {
-        width: 100% !important;
-        min-width: 500px !important;
-        font-size: 12px !important;
-        margin-bottom: 0 !important;
-        display: table !important;
-        table-layout: auto !important;
-    }
-    
-    .table-responsive th,
-    .table-responsive td {
-        padding: 8px 6px !important;
-        white-space: nowrap !important;
-        font-size: 11px !important;
-    }
-    
+    /* Card body - ALLOW TABLE SCROLL */
     .card-body {
         padding: 10px !important;
-        overflow-x: visible !important;
+        overflow-x: visible !important; /* CHANGED: Allow horizontal scroll */
         overflow-y: visible !important;
+        width: 100% !important;
         max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     
-    .card {
-        overflow: visible !important;
-        max-width: 100% !important;
+    /* Specific fix for Generate Voucher card body */
+    .card:first-of-type .card-body,
+    .dashboard-grid .card:first-child .card-body {
+        overflow-x: hidden !important; /* Only hide overflow for price boxes section */
+    }
+    
+    /* Specific fix for Transaction card body */
+    .dashboard-grid .card:last-child .card-body {
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+        padding: 5px !important;
     }
     
     .card-header {
@@ -505,9 +503,207 @@ include_once('include_nav.php');
         margin-bottom: 5px !important;
     }
     
+    /* Balance card mobile */
+    .balance-card {
+        padding: 20px 15px;
+        margin-bottom: 15px;
+    }
+    
+    .balance-amount {
+        font-size: 32px;
+    }
+    
+    .balance-label {
+        font-size: 12px;
+    }
+    
+    /* PRICE BOXES - FULL WIDTH RESPONSIVE */
+    .price-boxes {
+        flex-direction: column !important;
+        gap: 10px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 15px 0 !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+    }
+    
+    .price-box {
+        flex: 1 1 100% !important;
+        min-width: 0 !important; /* CHANGED: Allow flex to shrink */
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 15px !important;
+        box-sizing: border-box !important;
+    }
+    
+    .price-box-header {
+        font-size: 16px !important;
+    }
+    
+    .price-box-amount {
+        font-size: 20px !important;
+        padding: 8px !important;
+    }
+    
+    .price-box-details {
+        font-size: 12px !important;
+    }
+    
+    /* GENERATE SECTION - FULL WIDTH FIX */
+    .generate-section-box {
+        padding: 15px !important;
+        margin-top: 15px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+    
+    .generate-title {
+        font-size: 18px !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .selected-package-info {
+        padding: 10px 12px !important;
+        font-size: 14px !important;
+    }
+    
+    .package-name {
+        font-size: 16px !important;
+    }
+    
+    .form-label-clear {
+        font-size: 14px !important;
+    }
+    
+    .form-control-clear {
+        padding: 10px !important;
+        font-size: 14px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        background-color: #ffffff !important; /* Ensure white background */
+        color: #2d3748 !important; /* Ensure dark text */
+    }
+    
+    .form-control-clear::placeholder {
+        color: #a0aec0 !important;
+    }
+    
+    .btn-generate-voucher {
+        width: 100% !important;
+        min-width: auto !important;
+        padding: 14px 30px !important;
+        font-size: 16px !important;
+        box-sizing: border-box !important;
+    }
+    
+    .button-center {
+        margin-top: 15px !important;
+    }
+    
+    /* FIX Recent Transactions Table - ENHANCED */
+    /* Allow table to extend beyond card-body */
+    .dashboard-grid .card:last-child .card-body {
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+        padding: 5px 0 !important; /* Remove horizontal padding */
+    }
+    
+    .table-responsive {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch !important;
+        width: calc(100vw - 20px) !important; /* Full viewport width minus padding */
+        max-width: calc(100vw - 20px) !important;
+        display: block !important;
+        margin: 0 -5px !important; /* Negative margin to extend */
+        padding: 10px !important;
+        -ms-overflow-style: -ms-autohiding-scrollbar !important;
+        position: relative !important;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        box-sizing: border-box !important;
+    }
+    
+    .table-responsive::-webkit-scrollbar {
+        height: 10px !important;
+        -webkit-appearance: none !important;
+    }
+    
+    .table-responsive::-webkit-scrollbar-track {
+        background: #f7fafc !important;
+        border-radius: 4px !important;
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #cbd5e0 !important;
+        border-radius: 4px !important;
+    }
+    
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #a0aec0 !important;
+    }
+    
+    .table-responsive > .table {
+        width: 100% !important;
+        min-width: 550px !important;
+        font-size: 12px !important;
+        margin-bottom: 0 !important;
+        display: table !important;
+        table-layout: auto !important;
+    }
+    
+    .table-responsive .table th {
+        padding: 10px 8px !important;
+        white-space: nowrap !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        background: #f7fafc !important;
+        border-bottom: 2px solid #e2e8f0 !important;
+    }
+    
+    .table-responsive .table td {
+        padding: 10px 8px !important;
+        white-space: nowrap !important;
+        font-size: 12px !important;
+        vertical-align: middle !important;
+    }
+    
     .badge {
-        padding: 3px 8px !important;
+        padding: 4px 8px !important;
         font-size: 10px !important;
+        display: inline-block !important;
+    }
+}
+
+/* EXTRA SMALL SCREENS */
+@media (max-width: 480px) {
+    .balance-amount {
+        font-size: 28px !important;
+    }
+    
+    .price-box {
+        padding: 12px !important;
+    }
+    
+    .price-box-amount {
+        font-size: 18px !important;
+    }
+    
+    .generate-section-box {
+        padding: 12px !important;
+    }
+    
+    .btn-generate-voucher {
+        padding: 12px 20px !important;
+        font-size: 15px !important;
+    }
+    
+    .table-responsive > .table {
+        min-width: 500px !important; /* Smaller min-width for very small screens */
     }
 }
 </style>
@@ -666,31 +862,31 @@ include_once('include_nav.php');
             <div class="card-header">
                 <h3><i class="fa fa-history"></i> Recent Transactions</h3>
             </div>
-            <div class="card-body" style="padding: 15px;">
+            <div class="card-body">
                 <?php if (!empty($transactions)): ?>
-                <div class="table-responsive" style="overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; width: 100% !important; display: block !important; -ms-overflow-style: -ms-autohiding-scrollbar !important;">
-                <table class="table table-bordered table-hover" style="width: 100% !important; min-width: 500px !important; margin-bottom: 0 !important; display: table !important;">
+                <div class="table-responsive">
+                <table class="table table-bordered table-hover">
                     <thead>
                         <tr>
-                            <th style="padding: 8px 6px; font-size: 12px; white-space: nowrap;">Date</th>
-                            <th style="padding: 8px 6px; font-size: 12px; white-space: nowrap;">Type</th>
-                            <th style="padding: 8px 6px; font-size: 12px; white-space: nowrap;">Amount</th>
-                            <th style="padding: 8px 6px; font-size: 12px; white-space: nowrap;">Description</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Description</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($transactions as $trx): ?>
                         <tr>
-                            <td style="padding: 8px 6px; font-size: 11px; white-space: nowrap;"><?= date('d/m H:i', strtotime($trx['created_at'])); ?></td>
-                            <td style="padding: 8px 6px; font-size: 11px;">
+                            <td><?= date('d/m H:i', strtotime($trx['created_at'])); ?></td>
+                            <td>
                                 <span class="badge badge-<?= $trx['transaction_type']; ?>">
                                     <?= ucfirst($trx['transaction_type']); ?>
                                 </span>
                             </td>
-                            <td style="padding: 8px 6px; font-size: 11px; font-weight: bold; color: <?= $trx['transaction_type'] == 'topup' ? '#10b981' : '#ef4444'; ?>; white-space: nowrap;">
+                            <td style="font-weight: bold; color: <?= $trx['transaction_type'] == 'topup' ? '#10b981' : '#ef4444'; ?>;">
                                 <?= $trx['transaction_type'] == 'topup' ? '+' : '-'; ?>Rp <?= number_format($trx['amount'], 0, ',', '.'); ?>
                             </td>
-                            <td style="padding: 8px 6px; font-size: 11px; white-space: nowrap;"><?= htmlspecialchars($trx['description'] ?: ($trx['profile_name'] . ' - ' . $trx['voucher_username'])); ?></td>
+                            <td><?= htmlspecialchars($trx['description'] ?: ($trx['profile_name'] . ' - ' . $trx['voucher_username'])); ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

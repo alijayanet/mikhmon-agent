@@ -23,6 +23,40 @@ include_once('include_nav.php');
 ?>
 
 <style>
+/* UNIVERSAL FIX - PREVENT ALL OVERFLOW */
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+/* Mobile specific container fix */
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden !important;
+    }
+    
+    .content-wrapper,
+    .row,
+    .col-12,
+    .card,
+    .card-body {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+    
+    .transaction-card {
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+}
+
 .badge {
     padding: 4px 12px;
     border-radius: 12px;
@@ -97,12 +131,24 @@ include_once('include_nav.php');
 }
 
 .transaction-card {
-    background: #fff;
+    background: #ffffff !important; /* Force white background */
+    background-color: #ffffff !important;
     border-radius: 14px;
     padding: 16px;
     margin-bottom: 16px;
     box-shadow: 0 8px 24px rgba(15,23,42,0.08);
     border: 1px solid rgba(15,23,42,0.06);
+}
+
+/* Override any theme dark background */
+.mobile-only .transaction-card {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+}
+
+div.transaction-card {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
 }
 
 .transaction-card .card-header {
@@ -116,7 +162,7 @@ include_once('include_nav.php');
 .transaction-card .card-header .date {
     font-weight: 700;
     font-size: 13px;
-    color: #0f172a;
+    color: #000000 !important; /* Pure black for maximum contrast */
 }
 
 .transaction-card .card-header .type-badge {
@@ -126,7 +172,7 @@ include_once('include_nav.php');
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    color: #fff;
+    color: #fff !important; /* White text on badge */
     background: #475569;
 }
 
@@ -151,18 +197,18 @@ include_once('include_nav.php');
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    color: #475569;
+    color: #475569 !important; /* Gray label - ensure visibility */
 }
 
 .transaction-card .value {
     font-size: 13px;
     font-weight: 600;
-    color: #0f172a;
+    color: #0f172a !important; /* Dark text - ensure visibility */
     word-break: break-word;
 }
 
 .transaction-card .value-muted {
-    color: #94a3b8;
+    color: #64748b !important; /* Muted but visible */
     font-weight: 500;
 }
 
@@ -172,11 +218,11 @@ include_once('include_nav.php');
 }
 
 .transaction-card .value-amount.positive {
-    color: #10b981;
+    color: #10b981 !important; /* Green for positive */
 }
 
 .transaction-card .value-amount.negative {
-    color: #ef4444;
+    color: #ef4444 !important; /* Red for negative */
 }
 
 .transaction-card .status-badge {
@@ -191,7 +237,7 @@ include_once('include_nav.php');
 
 .transaction-card .status-note {
     font-size: 12px;
-    color: #475569;
+    color: #475569 !important; /* Gray - ensure visibility */
     margin-top: 6px;
 }
 
@@ -346,6 +392,27 @@ include_once('include_nav.php');
     .transaction-card {
         display: block;
         width: 100%;
+        background: #ffffff !important; /* Force white */
+        background-color: #ffffff !important;
+    }
+    
+    /* Enhance date visibility on mobile */
+    .transaction-card .card-header .date {
+        font-size: 14px !important; /* Larger font on mobile */
+        font-weight: 800 !important; /* Extra bold */
+        color: #000000 !important; /* Pure black */
+        letter-spacing: 0.3px;
+    }
+    
+    .transaction-card .label {
+        font-size: 12px !important; /* Slightly larger */
+        font-weight: 800 !important; /* Bolder */
+        color: #1e293b !important; /* Darker gray */
+    }
+    
+    .transaction-card .value {
+        font-size: 14px !important; /* Larger font */
+        color: #000000 !important; /* Pure black */
     }
 
     .table-responsive {
