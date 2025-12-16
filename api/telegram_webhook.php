@@ -909,12 +909,10 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             }
             break;
             
-        // PPPoE callbacks - redirect to existing commands
+        
         case 'admin_ppp_active':
             try {
-                // INSTANT response
-                sendTelegramMessage($chatId, "📡 *PPPoE AKTIF*\n\n🔄 Mengambil data koneksi aktif...");
-                // Process in background
+                // Process immediately - function sends its own message
                 checkTelegramPPPoEActive($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_ppp_active callback: " . $e->getMessage());
@@ -924,9 +922,7 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'admin_ppp_offline':
             try {
-                // INSTANT response
-                sendTelegramMessage($chatId, "📴 *PPPoE OFFLINE*\n\n🔄 Mengambil data user offline...");
-                // Process in background
+                // Process immediately - function sends its own message
                 checkTelegramPPPoEOffline($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_ppp_offline callback: " . $e->getMessage());
@@ -952,12 +948,11 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             }
             break;
             
+        
         // Settings callbacks - redirect to existing commands
         case 'admin_ping':
             try {
-                // INSTANT response
-                sendTelegramMessage($chatId, "🔌 *PING TEST*\n\n🔄 Testing koneksi ke MikroTik...");
-                // Process in background
+                // Process immediately - function sends its own message
                 checkTelegramMikroTikPing($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_ping callback: " . $e->getMessage());
@@ -967,9 +962,7 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'admin_resource':
             try {
-                // INSTANT response
-                sendTelegramMessage($chatId, "💻 *RESOURCE USAGE*\n\n🔄 Mengambil informasi resource MikroTik...");
-                // Process in background
+                // Process immediately - function sends its own message
                 checkTelegramMikroTikResource($chatId);
             } catch (Exception $e) {
                 error_log("Error in admin_resource callback: " . $e->getMessage());
@@ -988,9 +981,7 @@ function handleCallbackQuery($chatId, $data, $callbackQueryId) {
             
         case 'admin_info':
             try {
-                // INSTANT response
-                sendTelegramMessage($chatId, "ℹ️ *SYSTEM INFO*\n\n🔄 Mengambil informasi sistem...");
-                // Process in background
+                // Process immediately - function sends its own message
                 processTelegramCommand($chatId, 'INFO');
             } catch (Exception $e) {
                 error_log("Error in admin_info callback: " . $e->getMessage());
@@ -1462,41 +1453,32 @@ function purchaseTelegramVoucher($chatId, $profileName, $isAdmin) {
         }
     }
     
+    
     // Format price
     if (strpos($currency, 'Rp') !== false || strpos($currency, 'IDR') !== false) {
-        $priceFormatted = $currency . " " . number_format((float)$sprice, 0, ",", ".");
+        $priceFormatted = number_format((float)$sprice, 0, ",", ".");
     } else {
-        $priceFormatted = $currency . " " . number_format((float)$sprice, 2);
+        $priceFormatted = number_format((float)$sprice, 2);
     }
     
-    // Send success message with instant format
-    $message = "✅ *VOUCHER BERHASIL DIBUAT*\n\n";
+    // Send success message - MATCH WhatsApp format exactly
+    $message = "🎫 *VOUCHER ANDA*\n\n";
     $message .= "━━━━━━━━━━━━━━━━━━━━\n\n";
-    $message .= "🏠 Hotspot: *$hotspotname*\n";
-    $message .= "📦 Profile: *$profileName*\n\n";
-    $message .= "👤 Username: `$username`\n";
-    $message .= "🔑 Password: `$password`\n\n";
-    
-    // Add session timeout if available
-    if (!empty($profile['session-timeout'])) {
-        $message .= "Time Limit: " . $profile['session-timeout'] . "\n";
-    }
-    if (!empty($validity)) {
-        $message .= "Validity: $validity\n";
-    }
-    if (!empty($priceFormatted)) {
-        $message .= "Harga: $priceFormatted\n";
-    }
-    
-    // Show balance for agent (not for admin)
-    if (!$isAdmin && $balanceAfter > 0) {
-        $message .= "\n💳 Saldo Anda: Rp " . number_format($balanceAfter, 0, ',', '.') . "\n";
-    }
-    
-    $message .= "\nLogin URL:\n";
+    $message .= "Hotspot: *$hotspotname*\n";
+    $message .= "Profile: *$profileName*\n\n";
+    $message .= "Username: `$username`\n";
+    $message .= "Password: `$password`\n\n";
+    $message .= "Validity: $validity\n";
+    $message .= "Harga: Rp $priceFormatted\n\n";
+    $message .= "Login URL:\n";
     $message .= "http://$dnsname/login?username=$username&password=$password\n\n";
     $message .= "━━━━━━━━━━━━━━━━━━━━\n";
     $message .= "_Terima kasih telah menggunakan layanan kami_";
+    
+    // Add balance info for agent (separate message for clarity)
+    if (!$isAdmin && $balanceAfter > 0) {
+        $message .= "\n\n💳 Saldo Anda: Rp " . number_format($balanceAfter, 0, ',', '.') . "\n";
+    }
     
     sendTelegramMessage($chatId, $message);
     
