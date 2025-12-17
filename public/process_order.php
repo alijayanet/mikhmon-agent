@@ -75,8 +75,13 @@ try {
         throw new Exception('Agent not found or inactive');
     }
     
-    // Get pricing data
-    $stmt = $conn->prepare("SELECT * FROM agent_profile_pricing WHERE id = :id AND agent_id = :agent_id AND is_active = 1");
+    
+    // Get pricing data from agent_profile_pricing (Public Sales pricing)
+    // Note: profile_id from POST is the ID from agent_profile_pricing table
+    $stmt = $conn->prepare("SELECT * FROM agent_profile_pricing 
+                           WHERE id = :id 
+                           AND agent_id = :agent_id 
+                           AND is_active = 1");
     $stmt->execute([':id' => $profile_id, ':agent_id' => $agent['id']]);
     $pricing = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -99,7 +104,7 @@ try {
     // Generate transaction ID
     $transaction_id = 'TRX-' . time() . '-' . rand(10000, 99999);
     
-    // Calculate total amount (price + admin fee if any)
+    // Calculate total amount using price from agent_profile_pricing  
     $price = $pricing['price'];
     $admin_fee = 0; // Will be calculated based on payment method
     $total_amount = $price + $admin_fee;
