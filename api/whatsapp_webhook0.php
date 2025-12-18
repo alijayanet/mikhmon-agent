@@ -2581,14 +2581,19 @@ function getCustomerUsernameByPhone($phone) {
                         $phoneVariants[] = '62' . substr($phone, 1);
                     }
                     
-                    // Search in billing_customers
+                    // Search in billing_customers - use genieacs_pppoe_username or service_number
                     foreach ($phoneVariants as $variant) {
-                        $stmt = $db->prepare("SELECT username FROM billing_customers WHERE phone = :phone OR phone = :phone2 LIMIT 1");
+                        $stmt = $db->prepare("SELECT genieacs_pppoe_username, service_number FROM billing_customers WHERE phone = :phone OR phone = :phone2 LIMIT 1");
                         $stmt->execute([':phone' => $variant, ':phone2' => $variant]);
                         $customer = $stmt->fetch(PDO::FETCH_ASSOC);
                         
-                        if ($customer && !empty($customer['username'])) {
-                            return $customer['username'];
+                        if ($customer) {
+                            // Priority: genieacs_pppoe_username first, then service_number
+                            if (!empty($customer['genieacs_pppoe_username'])) {
+                                return $customer['genieacs_pppoe_username'];
+                            } elseif (!empty($customer['service_number'])) {
+                                return $customer['service_number'];
+                            }
                         }
                     }
                 }
@@ -2752,16 +2757,19 @@ function findDeviceByPhoneOrUsername($phone, $query) {
             try {
                 $db = getDBConnection();
                 if ($db) {
-                    // Search in billing customers
-                    $stmt = $db->prepare("SELECT * FROM billing_customers WHERE phone LIKE :query OR username LIKE :query LIMIT 10");
+                    // Search in billing customers - use genieacs_pppoe_username or service_number
+                    $stmt = $db->prepare("SELECT * FROM billing_customers WHERE phone LIKE :query OR genieacs_pppoe_username LIKE :query OR service_number LIKE :query LIMIT 10");
                     $queryParam = '%' . $query . '%';
                     $stmt->execute([':query' => $queryParam]);
                     
                     while ($customer = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        // Get username-like field with priority
+                        $usernameField = $customer['genieacs_pppoe_username'] ?? $customer['service_number'] ?? 'N/A';
+                        
                         $results[] = [
                             'type' => 'Billing Customer',
                             'phone' => $customer['phone'] ?? 'N/A',
-                            'username' => $customer['username'] ?? 'N/A',
+                            'username' => $usernameField,
                             'status' => $customer['status'] ?? 'N/A',
                             'service_type' => $customer['service_type'] ?? 'N/A'
                         ];

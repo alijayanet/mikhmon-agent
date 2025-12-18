@@ -65,13 +65,18 @@ function getTelegramDeviceID($chatId) {
     $db = getDBConnection();
     if (!$db) return null;
 
-    // Check billing_customers
-    $stmt = $db->prepare("SELECT username FROM billing_customers WHERE telegram_chat_id = ? LIMIT 1");
+    // Check billing_customers - use genieacs_pppoe_username or service_number as device ID
+    $stmt = $db->prepare("SELECT genieacs_pppoe_username, service_number FROM billing_customers WHERE telegram_chat_id = ? LIMIT 1");
     $stmt->execute([$chatId]);
     $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($customer && !empty($customer['username'])) {
-        return $customer['username'];
+    if ($customer) {
+        // Priority: genieacs_pppoe_username first, then service_number
+        if (!empty($customer['genieacs_pppoe_username'])) {
+            return $customer['genieacs_pppoe_username'];
+        } elseif (!empty($customer['service_number'])) {
+            return $customer['service_number'];
+        }
     }
 
     return null;
