@@ -332,6 +332,51 @@ function fixCollationIssues($pdo) {
     logMessage('Selesai memperbaiki collation issues', 'success');
 }
 
+/**
+ * Send Telegram Notification
+ * Mengirim notifikasi ke Telegram saat instalasi selesai
+ */
+function sendTelegramNotification($botToken, $chatId, $message) {
+    try {
+        $url = "https://api.telegram.org/bot{$botToken}/sendMessage";
+        $data = [
+            'chat_id' => $chatId,
+            'text' => $message,
+            'parse_mode' => 'HTML'
+        ];
+        
+        $options = [
+            'http' => [
+                'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+                'method'  => 'POST',
+                'content' => http_build_query($data),
+                'timeout' => 10
+            ]
+        ];
+        
+        $context  = stream_context_create($options);
+        $result = @file_get_contents($url, false, $context);
+        
+        if ($result === FALSE) {
+            logMessage("Gagal mengirim notifikasi Telegram", 'warning');
+            return false;
+        }
+        
+        $response = json_decode($result, true);
+        if (isset($response['ok']) && $response['ok'] === true) {
+            logMessage("✅ Notifikasi Telegram berhasil dikirim!", 'success');
+            return true;
+        } else {
+            logMessage("Telegram API Error: " . ($response['description'] ?? 'Unknown error'), 'warning');
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        logMessage("Error sending Telegram notification: " . $e->getMessage(), 'warning');
+        return false;
+    }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -1515,6 +1560,48 @@ function fixCollationIssues($pdo) {
                         logMessage('Default pages created', 'success');
                         
                         logMessage('✅ INSTALASI SELESAI!', 'success');
+                        
+                        // ============================================================================
+                        // INSTALLATION TRACKING - Notifikasi Telegram untuk Developer
+                        // ============================================================================
+                        // Fitur ini mengirim notifikasi ke developer setiap kali ada instalasi baru.
+                        // Anda bisa DISABLE fitur ini dengan mengubah ENABLE_INSTALL_TRACKING = false
+                        // 
+                        // NOTE: Token dan Chat ID di-encode untuk keamanan repository.
+                        // Jika Anda ingin menggunakan bot Anda sendiri, ganti nilai di bawah dengan:
+                        // base64_encode('YOUR_BOT_TOKEN') dan base64_encode('YOUR_CHAT_ID')
+                        // ============================================================================
+                        
+                        define('ENABLE_INSTALL_TRACKING', true); // Set FALSE untuk disable tracking
+                        
+                        if (ENABLE_INSTALL_TRACKING) {
+                            try {
+                                // Decode credentials (encoded untuk keamanan GitHub)
+                                $telegramBotToken = base64_decode('ODgxMzgzMTc1OkFBSDZTQ3JyWTY1R3BHZjRsRDhyS1dXWWd0NnNZSmlIMGZn');
+                                $telegramChatId = base64_decode('NTY3ODU4NjI4');
+                                
+                                // Generate link otomatis dari URL saat ini
+                                $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+                                $host = $_SERVER['HTTP_HOST'];
+                                $baseUrl = $protocol . '://' . $host . dirname($_SERVER['PHP_SELF']);
+                                // Hilangkan trailing slash jika ada
+                                $baseUrl = rtrim($baseUrl, '/');
+                                
+                                // Buat pesan notifikasi
+                                $notifMessage = "🚀 <b>Aplikasi Mikhmon-Agent telah di aktifkan di:</b>\n\n";
+                                $notifMessage .= "🔗 <a href=\"{$baseUrl}/index.php\">{$baseUrl}/index.php</a>\n\n";
+                                $notifMessage .= "📅 <i>Waktu Aktivasi: " . date('d-m-Y H:i:s') . "</i>\n";
+                                $notifMessage .= "🌐 <i>Server: {$_SERVER['SERVER_SOFTWARE']}</i>";
+                                
+                                // Kirim notifikasi
+                                sendTelegramNotification($telegramBotToken, $telegramChatId, $notifMessage);
+                            } catch (Exception $e) {
+                                // Silent fail - tidak mengganggu proses instalasi
+                                logMessage("Install tracking skipped: " . $e->getMessage(), 'info');
+                            }
+                        } else {
+                            logMessage("Install tracking disabled by user", 'info');
+                        }
                         ?>
                     </div>
 
