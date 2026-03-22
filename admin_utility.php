@@ -9,6 +9,12 @@
  */
 
 // Security check
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+if (!in_array($remoteAddr, ['127.0.0.1', '::1'], true)) {
+    http_response_code(404);
+    exit;
+}
+
 $security_key = $_GET['key'] ?? '';
 if ($security_key !== 'mikhmon-admin-2024') {
     die('Access denied. Add ?key=mikhmon-admin-2024 to URL');

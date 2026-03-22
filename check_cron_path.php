@@ -12,6 +12,12 @@
  * 4. Hapus file ini setelah selesai (untuk keamanan)
  */
 
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+if (!in_array($remoteAddr, ['127.0.0.1', '::1'], true)) {
+    http_response_code(404);
+    exit;
+}
+
 // Styling
 ?>
 <!DOCTYPE html>

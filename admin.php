@@ -164,9 +164,22 @@ if ($id == "login" || substr($url, -1) == "p") {
   echo "<script>window.location='./admin.php?id=login'</script>";
 } elseif ($id == "remove-logo" && $logo != ""  && !empty($session)) {
   include_once('./include/menu.php');
-  $logopath = "./img/";
-  $remlogo = $logopath . $logo;
-  unlink("$remlogo");
+  $logoFile = basename($logo);
+  $ext = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
+  $allowedExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico'];
+  if ($logoFile !== $logo || $logoFile === '' || !in_array($ext, $allowedExts, true)) {
+    echo "<script>window.location='./admin.php?id=uplogo&session=" . $session . "'</script>";
+    exit;
+  }
+
+  $logoDir = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'img');
+  $target = realpath(__DIR__ . DIRECTORY_SEPARATOR . 'img' . DIRECTORY_SEPARATOR . $logoFile);
+  if ($logoDir === false || $target === false || strpos($target, $logoDir) !== 0) {
+    echo "<script>window.location='./admin.php?id=uplogo&session=" . $session . "'</script>";
+    exit;
+  }
+
+  @unlink($target);
   echo "<script>window.location='./admin.php?id=uplogo&session=" . $session . "'</script>";
 } elseif ($id == "editor"  && !empty($session)) {
   include_once('./include/menu.php');
@@ -182,4 +195,3 @@ if ($id == "login" || substr($url, -1) == "p") {
 <?php include('./include/info.php'); ?>
 </body>
 </html>
-
