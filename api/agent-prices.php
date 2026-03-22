@@ -7,6 +7,11 @@
 // Start output buffering to catch any unwanted output
 ob_start();
 
+session_start();
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+$includeDebug = $isLocal;
+
 // Set error handling BEFORE any other code
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
@@ -17,11 +22,22 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Wrap EVERYTHING in try-catch
 try {
+    if (!$isLocal && !isset($_SESSION['mikhmon'])) {
+        ob_clean();
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access Denied']);
+        exit;
+    }
+
     // Check if request is POST
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         ob_clean();
         http_response_code(405);
-        echo json_encode(['success' => false, 'message' => 'Method Not Allowed', 'debug' => 'Not POST']);
+        $resp = ['success' => false, 'message' => 'Method Not Allowed'];
+        if ($includeDebug) {
+            $resp['debug'] = 'Not POST';
+        }
+        echo json_encode($resp);
         exit;
     }
 
@@ -39,12 +55,12 @@ try {
         if (!file_exists($file)) {
             ob_clean();
             http_response_code(500);
-            echo json_encode([
-                'success' => false, 
-                'message' => "File $name not found",
-                'debug' => "Path: $file",
-                'baseDir' => $baseDir
-            ]);
+            $resp = ['success' => false, 'message' => "File $name not found"];
+            if ($includeDebug) {
+                $resp['debug'] = "Path: $file";
+                $resp['baseDir'] = $baseDir;
+            }
+            echo json_encode($resp);
             exit;
         }
         
@@ -53,11 +69,11 @@ try {
         } catch (Exception $e) {
             ob_clean();
             http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'message' => "Error including $name",
-                'debug' => $e->getMessage()
-            ]);
+            $resp = ['success' => false, 'message' => "Error including $name"];
+            if ($includeDebug) {
+                $resp['debug'] = $e->getMessage();
+            }
+            echo json_encode($resp);
             exit;
         }
     }
@@ -68,7 +84,11 @@ try {
     if (empty($jsonInput)) {
         ob_clean();
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Empty request body', 'debug' => 'No JSON input']);
+        $resp = ['success' => false, 'message' => 'Empty request body'];
+        if ($includeDebug) {
+            $resp['debug'] = 'No JSON input';
+        }
+        echo json_encode($resp);
         exit;
     }
     
@@ -77,12 +97,12 @@ try {
     if (!$request) {
         ob_clean();
         http_response_code(400);
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Invalid JSON input',
-            'debug' => 'JSON decode failed: ' . json_last_error_msg(),
-            'raw_input' => substr($jsonInput, 0, 100)
-        ]);
+        $resp = ['success' => false, 'message' => 'Invalid JSON input'];
+        if ($includeDebug) {
+            $resp['debug'] = 'JSON decode failed: ' . json_last_error_msg();
+            $resp['raw_input'] = substr($jsonInput, 0, 100);
+        }
+        echo json_encode($resp);
         exit;
     }
 
@@ -91,7 +111,11 @@ try {
     if (!$action) {
         ob_clean();
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'No action specified', 'debug' => 'Missing action']);
+        $resp = ['success' => false, 'message' => 'No action specified'];
+        if ($includeDebug) {
+            $resp['debug'] = 'Missing action';
+        }
+        echo json_encode($resp);
         exit;
     }
 
@@ -101,11 +125,11 @@ try {
     } catch (Exception $e) {
         ob_clean();
         http_response_code(500);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Failed to initialize Agent class',
-            'debug' => $e->getMessage()
-        ]);
+        $resp = ['success' => false, 'message' => 'Failed to initialize Agent class'];
+        if ($includeDebug) {
+            $resp['debug'] = $e->getMessage();
+        }
+        echo json_encode($resp);
         exit;
     }
 
@@ -119,11 +143,11 @@ try {
         if (!$agentId || !$profileName) {
             ob_clean();
             http_response_code(400);
-            echo json_encode([
-                'success' => false, 
-                'message' => 'Agent dan Profile harus dipilih!',
-                'debug' => "agentId: $agentId, profileName: $profileName"
-            ]);
+            $resp = ['success' => false, 'message' => 'Agent dan Profile harus dipilih!'];
+            if ($includeDebug) {
+                $resp['debug'] = "agentId: $agentId, profileName: $profileName";
+            }
+            echo json_encode($resp);
             exit;
         }
 
@@ -137,20 +161,23 @@ try {
             } else {
                 ob_clean();
                 http_response_code(400);
-                echo json_encode([
-                    'success' => false, 
-                    'message' => $result['message'] ?? 'Gagal menyimpan harga',
-                    'debug' => $result
-                ]);
+                $resp = [
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Gagal menyimpan harga'
+                ];
+                if ($includeDebug) {
+                    $resp['debug'] = $result;
+                }
+                echo json_encode($resp);
             }
         } catch (Exception $e) {
             ob_clean();
             http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'message' => 'Error saat menyimpan harga',
-                'debug' => $e->getMessage()
-            ]);
+            $resp = ['success' => false, 'message' => 'Error saat menyimpan harga'];
+            if ($includeDebug) {
+                $resp['debug'] = $e->getMessage();
+            }
+            echo json_encode($resp);
         }
         exit;
     }
@@ -158,20 +185,27 @@ try {
     // Unknown action
     ob_clean();
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Unknown action', 'debug' => "action: $action"]);
+    $resp = ['success' => false, 'message' => 'Unknown action'];
+    if ($includeDebug) {
+        $resp['debug'] = "action: $action";
+    }
+    echo json_encode($resp);
     exit;
 
 } catch (Throwable $e) {
     // Catch ALL errors including Fatal Errors (PHP 7+)
     ob_clean();
     http_response_code(500);
-    echo json_encode([
+    $resp = [
         'success' => false,
-        'message' => 'Server Error',
-        'debug' => $e->getMessage(),
-        'file' => $e->getFile(),
-        'line' => $e->getLine(),
-        'trace' => $e->getTraceAsString()
-    ]);
+        'message' => 'Server Error'
+    ];
+    if ($includeDebug) {
+        $resp['debug'] = $e->getMessage();
+        $resp['file'] = $e->getFile();
+        $resp['line'] = $e->getLine();
+        $resp['trace'] = $e->getTraceAsString();
+    }
+    echo json_encode($resp);
     exit;
 }

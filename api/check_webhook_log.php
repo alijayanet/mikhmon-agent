@@ -4,6 +4,14 @@
  * Debug tool to see if webhook is receiving messages
  */
 
+session_start();
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+if (!$isLocal && !isset($_SESSION['mikhmon'])) {
+    http_response_code(404);
+    exit;
+}
+
 require_once('../include/db_config.php');
 
 echo "<!DOCTYPE html>

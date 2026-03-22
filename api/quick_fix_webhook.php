@@ -1,7 +1,7 @@
 <?php
 /**
- * Reset Telegram Webhook
- * Untuk clear pending updates yang error
+ * Quick Fix: Set Telegram Webhook
+ * Script ini akan otomatis set webhook URL yang benar
  */
 
 session_start();
@@ -13,9 +13,10 @@ if (!$isLocal && !isset($_SESSION['mikhmon'])) {
 }
 
 header('Content-Type: text/plain; charset=utf-8');
-require_once(__DIR__ . '/../include/telegram_config.php');
+echo "=== QUICK FIX: SET TELEGRAM WEBHOOK ===\n\n";
 
-echo "=== TELEGRAM WEBHOOK RESET ===\n\n";
+// Load config
+require_once(__DIR__ . '/../include/telegram_config.php');
 
 $botToken = TELEGRAM_BOT_TOKEN;
 if (empty($botToken)) {
@@ -23,8 +24,23 @@ if (empty($botToken)) {
     exit;
 }
 
-// Step 1: Delete webhook
-echo "1. Deleting webhook...\n";
+// Determine webhook URL
+// Try to get from current request or use default
+$protocol = 'https://';
+$host = 'billing.alijaya.net'; // Default host
+
+// If running from web, use current host
+if (isset($_SERVER['HTTP_HOST']) && !empty($_SERVER['HTTP_HOST'])) {
+    $host = $_SERVER['HTTP_HOST'];
+}
+
+$webhookUrl = $protocol . $host . '/api/telegram_webhook.php';
+
+echo "Bot Token: " . substr($botToken, 0, 10) . "...\n";
+echo "Webhook URL: $webhookUrl\n\n";
+
+// Step 1: Delete old webhook
+echo "Step 1: Deleting old webhook...\n";
 $url = "https://api.telegram.org/bot{$botToken}/deleteWebhook?drop_pending_updates=true";
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -34,15 +50,14 @@ curl_close($ch);
 
 $result = json_decode($response, true);
 if ($result['ok']) {
-    echo "   ✅ Webhook deleted!\n";
+    echo "   ✅ Old webhook deleted!\n";
     echo "   ✅ Pending updates cleared!\n\n";
 } else {
-    echo "   ❌ Failed: " . ($result['description'] ?? 'Unknown error') . "\n\n";
+    echo "   ⚠️  " . ($result['description'] ?? 'Unknown error') . "\n\n";
 }
 
 // Step 2: Set new webhook
-echo "2. Setting new webhook...\n";
-$webhookUrl = "https://billing.alijaya.net/api/telegram_webhook.php";
+echo "Step 2: Setting new webhook...\n";
 $url = "https://api.telegram.org/bot{$botToken}/setWebhook";
 
 $data = [
@@ -63,13 +78,14 @@ curl_close($ch);
 $result = json_decode($response, true);
 if ($result['ok']) {
     echo "   ✅ Webhook set successfully!\n";
-    echo "   Webhook URL: {$webhookUrl}\n\n";
+    echo "   URL: $webhookUrl\n\n";
 } else {
     echo "   ❌ Failed: " . ($result['description'] ?? 'Unknown error') . "\n\n";
+    exit;
 }
 
 // Step 3: Verify webhook
-echo "3. Verifying webhook...\n";
+echo "Step 3: Verifying webhook...\n";
 $url = "https://api.telegram.org/bot{$botToken}/getWebhookInfo";
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -85,13 +101,19 @@ if (isset($result['result'])) {
     echo "   Last Error: " . ($info['last_error_message'] ?? 'NONE') . "\n";
     
     if (empty($info['last_error_message']) && $info['pending_update_count'] == 0) {
-        echo "\n✅✅✅ WEBHOOK RESET SUCCESSFUL! ✅✅✅\n";
-        echo "\nBot should now respond to commands!\n";
-        echo "Try sending: /start\n";
+        echo "\n✅✅✅ WEBHOOK SET SUCCESSFULLY! ✅✅✅\n\n";
+        echo "🎉 Bot is now ready to receive messages!\n\n";
+        echo "📋 NEXT STEPS:\n";
+        echo "1. Open Telegram and find @mikrotik4011bot\n";
+        echo "2. Send /start to test\n";
+        echo "3. Configure admin chat ID in settings\n\n";
     } else {
         echo "\n⚠️  Webhook set but may have issues\n";
+        if (!empty($info['last_error_message'])) {
+            echo "Error: " . $info['last_error_message'] . "\n";
+        }
     }
 }
 
-echo "\n=== END ===\n";
+echo "\n=== DONE ===\n";
 ?>

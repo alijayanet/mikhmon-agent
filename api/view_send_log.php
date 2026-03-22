@@ -3,6 +3,14 @@
  * View Telegram Send Debug Log
  */
 
+session_start();
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+if (!$isLocal && !isset($_SESSION['mikhmon'])) {
+    http_response_code(404);
+    exit;
+}
+
 echo "<!DOCTYPE html>
 <html>
 <head>

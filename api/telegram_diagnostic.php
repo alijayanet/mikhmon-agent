@@ -4,6 +4,14 @@
  * Check semua kemungkinan masalah kenapa bot tidak merespon
  */
 
+session_start();
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+if (!$isLocal && !isset($_SESSION['mikhmon'])) {
+    http_response_code(404);
+    exit;
+}
+
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== TELEGRAM BOT DIAGNOSTIC ===\n\n";
 
