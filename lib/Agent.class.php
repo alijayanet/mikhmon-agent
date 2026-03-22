@@ -383,7 +383,7 @@ class Agent {
                        bc.name AS billing_customer_name,
                        bp.profile_name AS billing_profile_name
                 FROM agent_transactions at
-                LEFT JOIN digiflazz_transactions dt ON dt.ref_id = at.voucher_username
+                LEFT JOIN digiflazz_transactions dt ON dt.ref_id COLLATE utf8mb4_unicode_ci = at.voucher_username COLLATE utf8mb4_unicode_ci
                 LEFT JOIN billing_invoices bi ON bi.id = at.reference_id
                 LEFT JOIN billing_customers bc ON bc.id = bi.customer_id
                 LEFT JOIN billing_profiles bp ON bp.id = bc.profile_id
@@ -407,7 +407,7 @@ class Agent {
                        dt.customer_name AS digiflazz_customer_name, dt.price AS digiflazz_base_price,
                        dt.sell_price AS digiflazz_sell_price
                 FROM agent_transactions at
-                LEFT JOIN digiflazz_transactions dt ON dt.ref_id = at.voucher_username
+                LEFT JOIN digiflazz_transactions dt ON dt.ref_id COLLATE utf8mb4_unicode_ci = at.voucher_username COLLATE utf8mb4_unicode_ci
                 WHERE at.agent_id = :agent_id AND at.transaction_type = 'digiflazz'
                 ORDER BY at.created_at DESC
                 LIMIT :limit";
@@ -430,7 +430,7 @@ class Agent {
                        a.agent_name, a.agent_code
                 FROM agent_transactions at
                 INNER JOIN agents a ON a.id = at.agent_id
-                LEFT JOIN digiflazz_transactions dt ON dt.ref_id = at.voucher_username
+                LEFT JOIN digiflazz_transactions dt ON dt.ref_id COLLATE utf8mb4_unicode_ci = at.voucher_username COLLATE utf8mb4_unicode_ci
                 WHERE at.transaction_type = 'digiflazz'";
 
         $params = [];

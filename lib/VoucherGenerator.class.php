@@ -381,7 +381,11 @@ class VoucherGenerator {
         }
         
         // Get MikroTik config for hotspot name and DNS
-        include_once(__DIR__ . '/../include/config.php');
+        global $data; // Must declare global to access config
+        
+        if (!isset($data) || empty($data)) {
+            include_once(__DIR__ . '/../include/config.php');
+        }
         
         $session = null;
         foreach ($data as $sess => $sessData) {
@@ -393,6 +397,7 @@ class VoucherGenerator {
         
         $hotspotName = 'WiFi Hotspot';
         $dnsName = '';
+        $loginUrl = '';
         
         if ($session && isset($data[$session])) {
             // Get hotspot name
@@ -414,9 +419,14 @@ class VoucherGenerator {
             // Get IP as fallback
             $iphost = explode('!', $data[$session][1])[1] ?? '';
             $loginUrl = !empty($dnsName) ? "http://$dnsName" : "http://$iphost";
-        } else {
-            $loginUrl = '';
         }
+        
+        // If still empty, use a fallback message
+        if (empty($loginUrl)) {
+            error_log("VoucherGenerator: Unable to determine login URL for transaction " . $transaction['transaction_id']);
+            $loginUrl = "http://hotspot.login"; // Generic fallback
+        }
+        
         
         // Format message - MATCH standard format
         $message = "🎫 *VOUCHER ANDA*\n\n";
