@@ -1252,6 +1252,254 @@ function sendTelegramNotification($botToken, $chatId, $message) {
                             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
                         ];
                         
+                        // === FITUR TAMBAHAN TABLES (tidak ada di versi lama) ===
+                        // Tabel-tabel ini untuk fitur topup, WhatsApp, GenieACS, dsb.
+                        
+                        $extraTables = [
+                            'agent_topup_requests' => "CREATE TABLE IF NOT EXISTS `agent_topup_requests` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `agent_id` INT NOT NULL,
+                                `amount` DECIMAL(15,2) NOT NULL,
+                                `payment_method` VARCHAR(50) DEFAULT 'manual',
+                                `payment_bank` VARCHAR(50),
+                                `payment_account` VARCHAR(50),
+                                `payment_proof` VARCHAR(255),
+                                `transfer_date` DATE,
+                                `status` ENUM('pending','approved','rejected') DEFAULT 'pending',
+                                `admin_note` TEXT,
+                                `processed_by` VARCHAR(50),
+                                `processed_at` DATETIME,
+                                `reference_id` VARCHAR(100),
+                                `gateway_name` VARCHAR(50),
+                                `gateway_ref` VARCHAR(100),
+                                `payment_url` TEXT,
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                INDEX `idx_agent_id` (`agent_id`),
+                                INDEX `idx_status` (`status`),
+                                INDEX `idx_created_at` (`created_at`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'agent_summary' => "CREATE TABLE IF NOT EXISTS `agent_summary` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `agent_id` INT NOT NULL,
+                                `period` CHAR(7) NOT NULL COMMENT 'Format: YYYY-MM',
+                                `total_transactions` INT DEFAULT 0,
+                                `total_vouchers` INT DEFAULT 0,
+                                `total_revenue` DECIMAL(15,2) DEFAULT 0,
+                                `total_commission` DECIMAL(15,2) DEFAULT 0,
+                                `total_topup` DECIMAL(15,2) DEFAULT 0,
+                                `balance_start` DECIMAL(15,2) DEFAULT 0,
+                                `balance_end` DECIMAL(15,2) DEFAULT 0,
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                UNIQUE KEY `unique_agent_period` (`agent_id`, `period`),
+                                INDEX `idx_period` (`period`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'payment_records' => "CREATE TABLE IF NOT EXISTS `payment_records` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `reference_id` VARCHAR(100) NOT NULL,
+                                `transaction_type` ENUM('topup','voucher','billing') DEFAULT 'topup',
+                                `related_id` INT,
+                                `agent_id` INT,
+                                `customer_phone` VARCHAR(20),
+                                `amount` DECIMAL(15,2) NOT NULL,
+                                `gateway_name` VARCHAR(50),
+                                `payment_channel` VARCHAR(50),
+                                `payment_status` ENUM('pending','paid','failed','expired','refunded') DEFAULT 'pending',
+                                `gateway_response` TEXT,
+                                `paid_at` DATETIME,
+                                `expired_at` DATETIME,
+                                `callback_received_at` DATETIME,
+                                `notes` TEXT,
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                UNIQUE KEY `unique_reference` (`reference_id`),
+                                INDEX `idx_agent_id` (`agent_id`),
+                                INDEX `idx_status` (`payment_status`),
+                                INDEX `idx_gateway` (`gateway_name`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'whatsapp_settings' => "CREATE TABLE IF NOT EXISTS `whatsapp_settings` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `setting_key` VARCHAR(100) NOT NULL,
+                                `setting_value` TEXT,
+                                `description` VARCHAR(255),
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                UNIQUE KEY `unique_key` (`setting_key`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'system_settings' => "CREATE TABLE IF NOT EXISTS `system_settings` (
+                                `setting_key` VARCHAR(100) NOT NULL,
+                                `setting_value` TEXT,
+                                `setting_type` VARCHAR(20) DEFAULT 'string',
+                                `description` TEXT,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                PRIMARY KEY (`setting_key`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'genieacs_devices' => "CREATE TABLE IF NOT EXISTS `genieacs_devices` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `device_id` VARCHAR(255) NOT NULL,
+                                `customer_id` INT UNSIGNED DEFAULT NULL,
+                                `serial_number` VARCHAR(100),
+                                `oui` VARCHAR(20),
+                                `product_class` VARCHAR(100),
+                                `manufacturer` VARCHAR(100),
+                                `model` VARCHAR(100),
+                                `firmware` VARCHAR(100),
+                                `ip_address` VARCHAR(45),
+                                `mac_address` VARCHAR(17),
+                                `ssid` VARCHAR(100),
+                                `ssid_password` VARCHAR(100),
+                                `pppoe_username` VARCHAR(100),
+                                `pppoe_status` ENUM('connected','disconnected','unknown') DEFAULT 'unknown',
+                                `signal_dbm` INT,
+                                `status` ENUM('online','offline','unknown') DEFAULT 'unknown',
+                                `last_seen` DATETIME,
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                UNIQUE KEY `unique_device_id` (`device_id`),
+                                INDEX `idx_customer_id` (`customer_id`),
+                                INDEX `idx_pppoe_username` (`pppoe_username`),
+                                INDEX `idx_status` (`status`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'notification_queue' => "CREATE TABLE IF NOT EXISTS `notification_queue` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `type` ENUM('whatsapp','telegram','email','sms') NOT NULL DEFAULT 'whatsapp',
+                                `recipient` VARCHAR(100) NOT NULL,
+                                `message` TEXT NOT NULL,
+                                `context` VARCHAR(100),
+                                `related_id` INT,
+                                `status` ENUM('pending','sent','failed','skipped') DEFAULT 'pending',
+                                `attempts` INT DEFAULT 0,
+                                `max_attempts` INT DEFAULT 3,
+                                `sent_at` DATETIME,
+                                `scheduled_at` DATETIME,
+                                `error_message` TEXT,
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                INDEX `idx_status` (`status`),
+                                INDEX `idx_type` (`type`),
+                                INDEX `idx_scheduled_at` (`scheduled_at`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'cron_log' => "CREATE TABLE IF NOT EXISTS `cron_log` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `job_name` VARCHAR(100) NOT NULL,
+                                `status` ENUM('success','error','running') DEFAULT 'running',
+                                `message` TEXT,
+                                `started_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `finished_at` DATETIME,
+                                `duration_ms` INT,
+                                INDEX `idx_job_name` (`job_name`),
+                                INDEX `idx_started_at` (`started_at`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'digiflazz_price_markup' => "CREATE TABLE IF NOT EXISTS `digiflazz_price_markup` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `agent_id` INT NOT NULL,
+                                `buyer_sku_code` VARCHAR(50) NOT NULL,
+                                `markup_type` ENUM('fixed','percentage') DEFAULT 'fixed',
+                                `markup_value` DECIMAL(10,2) DEFAULT 0,
+                                `sell_price` INT DEFAULT 0,
+                                `is_active` TINYINT(1) DEFAULT 1,
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                UNIQUE KEY `unique_agent_sku` (`agent_id`, `buyer_sku_code`),
+                                INDEX `idx_agent_id` (`agent_id`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+                            'agent_login_logs' => "CREATE TABLE IF NOT EXISTS `agent_login_logs` (
+                                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                                `agent_id` INT,
+                                `agent_code` VARCHAR(20),
+                                `ip_address` VARCHAR(45),
+                                `user_agent` TEXT,
+                                `status` ENUM('success','failed','locked') DEFAULT 'success',
+                                `fail_reason` VARCHAR(100),
+                                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                INDEX `idx_agent_id` (`agent_id`),
+                                INDEX `idx_created_at` (`created_at`)
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                        ];
+
+                        logMessage('Installing additional feature tables...', 'info');
+                        foreach ($extraTables as $name => $ddl) {
+                            ensureTable($pdo, $name, $ddl);
+                        }
+
+                        // Extra columns not in original schema
+                        ensureColumn($pdo, 'agents', 'whatsapp_number', 'VARCHAR(20) DEFAULT NULL', 'telegram_chat_id');
+                        ensureColumn($pdo, 'agents', 'login_token', 'VARCHAR(64) DEFAULT NULL', 'last_login');
+                        ensureColumn($pdo, 'agents', 'token_expires_at', 'DATETIME DEFAULT NULL', 'login_token');
+                        ensureColumn($pdo, 'agents', 'failed_login_attempts', 'INT DEFAULT 0', 'token_expires_at');
+                        ensureColumn($pdo, 'agents', 'locked_until', 'DATETIME DEFAULT NULL', 'failed_login_attempts');
+                        ensureColumn($pdo, 'billing_customers', 'mikrotik_username', 'VARCHAR(100) DEFAULT NULL', 'genieacs_pppoe_username');
+                        ensureColumn($pdo, 'billing_customers', 'genieacs_device_id', 'VARCHAR(255) DEFAULT NULL', 'mikrotik_username');
+                        ensureColumn($pdo, 'billing_invoices', 'gateway_name', 'VARCHAR(50) DEFAULT NULL', 'payment_channel');
+                        ensureColumn($pdo, 'billing_invoices', 'gateway_ref', 'VARCHAR(100) DEFAULT NULL', 'gateway_name');
+                        ensureColumn($pdo, 'public_sales', 'whatsapp_sent', 'TINYINT(1) DEFAULT 0', 'notes');
+                        ensureColumn($pdo, 'public_sales', 'telegram_sent', 'TINYINT(1) DEFAULT 0', 'whatsapp_sent');
+                        ensureColumn($pdo, 'payment_gateway_config', 'webhook_url', 'VARCHAR(255) DEFAULT NULL', 'callback_token');
+                        ensureColumn($pdo, 'payment_gateway_config', 'return_url', 'VARCHAR(255) DEFAULT NULL', 'webhook_url');
+                        ensureColumn($pdo, 'payment_gateway_config', 'min_amount', 'DECIMAL(12,2) DEFAULT 10000', 'return_url');
+                        ensureColumn($pdo, 'payment_gateway_config', 'max_amount', 'DECIMAL(12,2) DEFAULT 100000000', 'min_amount');
+
+                        // Default WhatsApp settings
+                        if (tableExists($pdo, 'whatsapp_settings')) {
+                            $waSt = $pdo->prepare("INSERT IGNORE INTO `whatsapp_settings` (setting_key, setting_value, description) VALUES (?,?,?)");
+                            $waDefaults = [
+                                ['wa_gateway','fonnte','Gateway WhatsApp: fonnte/wablas/woowa/mpwa'],
+                                ['wa_token','','API Token/Key WhatsApp Gateway'],
+                                ['wa_sender','','Nomor pengirim WhatsApp (format: 628xxx)'],
+                                ['wa_enabled','0','Aktifkan integrasi WhatsApp'],
+                                ['wa_otp_enabled','0','Aktifkan OTP via WhatsApp'],
+                                ['wa_notif_topup','1','Notif topup approved ke agen'],
+                                ['wa_notif_voucher','1','Notif voucher ke customer'],
+                                ['wa_notif_invoice','1','Notif tagihan billing ke pelanggan'],
+                                ['wa_notif_overdue','1','Notif tagihan jatuh tempo'],
+                                ['wa_reminder_days','3,1','Hari sebelum jatuh tempo untuk reminder'],
+                            ];
+                            foreach ($waDefaults as $r) $waSt->execute($r);
+                            logMessage('WhatsApp default settings seeded', 'success');
+                        }
+
+                        // Default system settings
+                        if (tableExists($pdo, 'system_settings')) {
+                            $sysSt = $pdo->prepare("INSERT IGNORE INTO `system_settings` (setting_key, setting_value, setting_type, description) VALUES (?,?,?,?)");
+                            $sysDefaults = [
+                                ['app_name','MikhMon Agent','string','Nama Aplikasi'],
+                                ['app_version','2.0','string','Versi Aplikasi'],
+                                ['app_url','','string','URL Aplikasi (https://domain.com)'],
+                                ['maintenance_mode','0','boolean','Mode maintenance'],
+                                ['debug_mode','0','boolean','Mode debug'],
+                                ['timezone','Asia/Jakarta','string','Zona waktu server'],
+                                ['currency','IDR','string','Mata uang'],
+                                ['currency_symbol','Rp','string','Simbol mata uang'],
+                            ];
+                            foreach ($sysDefaults as $r) $sysSt->execute($r);
+                            logMessage('System default settings seeded', 'success');
+                        }
+
+                        // Extra billing settings
+                        if (tableExists($pdo, 'billing_settings')) {
+                            $bsSt = $pdo->prepare("INSERT IGNORE INTO `billing_settings` (setting_key, setting_value) VALUES (?,?)");
+                            $bsDefaults = [
+                                ['grace_period_days','3'],['isolation_auto','1'],
+                                ['invoice_prefix','INV'],['wa_reminder_enabled','1'],
+                                ['wa_reminder_days','3,1'],['overdue_action','isolate'],
+                                ['invoice_generate_day','1'],['genieacs_url',''],
+                                ['genieacs_username','admin'],['genieacs_password',''],
+                                ['whatsapp_template_invoice',''],['whatsapp_template_reminder',''],
+                            ];
+                            foreach ($bsDefaults as $r) $bsSt->execute($r);
+                            logMessage('Billing extra settings seeded', 'success');
+                        }
+                        
                         foreach ($tables as $name => $ddl) {
                             ensureTable($pdo, $name, $ddl);
                         }
